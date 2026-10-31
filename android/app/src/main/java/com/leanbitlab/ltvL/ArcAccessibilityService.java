@@ -20,7 +20,7 @@ import android.widget.TextView;
 /**
  * Two things that need to work on top of any app:
  *
- * 1. The Ljusstyrka (dim) layer. Drawn as an accessibility overlay, which Android does not hide over its
+ * 1. The dim layer. Drawn as an accessibility overlay, which Android does not hide over its
  *    own Settings screens (ordinary app overlays are hidden there) and which may be fully opaque.
  * 2. A quick panel on a spare remote button (the YouTube button by default), so brightness can be changed
  *    without leaving the app that is open.
@@ -150,7 +150,7 @@ public class ArcAccessibilityService extends AccessibilityService {
         box.setBackground(bg);
 
         TextView title = new TextView(this);
-        title.setText("Ljusstyrka");
+        title.setText("Brightness");
         title.setTextColor(Color.WHITE);
         title.setTextSize(22);
         box.addView(title);
@@ -163,8 +163,8 @@ public class ArcAccessibilityService extends AccessibilityService {
 
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        Button darker = button("− Mörkare", v -> changeBrightness(-STEP));
-        Button lighter = button("+ Ljusare", v -> changeBrightness(+STEP));
+        Button darker = button("− Darker", v -> changeBrightness(-STEP));
+        Button lighter = button("+ Brighter", v -> changeBrightness(+STEP));
         row.addView(darker);
         row.addView(lighter);
         box.addView(row);
@@ -175,7 +175,7 @@ public class ArcAccessibilityService extends AccessibilityService {
             applyDimNow();
         });
         box.addView(toggleButton);
-        box.addView(button("Stäng", v -> hidePanel()));
+        box.addView(button("Close", v -> hidePanel()));
 
         box.setFocusable(true);
         box.setOnKeyListener((v, keyCode, event) -> {
@@ -226,7 +226,7 @@ public class ArcAccessibilityService extends AccessibilityService {
         return b;
     }
 
-    /** Using the panel always means "dim now": it turns Kvällsläge on and changes its level. */
+    /** Using the panel always means "dim now": it turns dimming on and changes its level. */
     private void changeBrightness(int delta) {
         SharedPreferences p = prefs(this);
         int brightness = (int) p.getLong(KEY_DIM_NOW_BRIGHTNESS, 40);
@@ -250,8 +250,8 @@ public class ArcAccessibilityService extends AccessibilityService {
         SharedPreferences p = prefs(this);
         boolean on = p.getBoolean(KEY_DIM_NOW, false);
         int brightness = (int) p.getLong(KEY_DIM_NOW_BRIGHTNESS, 40);
-        valueText.setText(on ? "Nedtonad till " + brightness + " %" : "Full ljusstyrka");
-        toggleButton.setText(on ? "Stäng av nedtoning" : "Tona ned till " + brightness + " %");
+        valueText.setText(on ? "Dimmed to " + brightness + " %" : "Full brightness");
+        toggleButton.setText(on ? "Turn off dimming" : "Dim to " + brightness + " %");
     }
 
     private int dp(int value) {

@@ -17,7 +17,7 @@ import android.view.View;
 import android.view.WindowManager;
 
 /**
- * Kvällsläge: a black, half-transparent layer over everything on the screen, video included.
+ * Screen dimming: a black, half-transparent layer over everything on the screen, video included.
  *
  * A Chromecast sends its picture over HDMI and has no backlight to turn down, and its Android build
  * lacks "Extra dim", so drawing a dark layer on top is the only way to dim the whole picture.
@@ -85,11 +85,11 @@ public class DimOverlayService extends Service {
 
     private void startInForeground() {
         NotificationManager nm = getSystemService(NotificationManager.class);
-        nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Kvällsläge", NotificationManager.IMPORTANCE_MIN));
+        nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Screen dimming", NotificationManager.IMPORTANCE_MIN));
         Notification notification = new Notification.Builder(this, CHANNEL)
                 .setSmallIcon(android.R.drawable.ic_menu_view)
-                .setContentTitle("Kvällsläge")
-                .setContentText("Skärmen är nedtonad")
+                .setContentTitle("Screen dimming")
+                .setContentText("The screen is dimmed")
                 .setOngoing(true)
                 .build();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {

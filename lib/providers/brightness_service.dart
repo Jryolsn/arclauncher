@@ -91,7 +91,7 @@ class BrightnessService extends ChangeNotifier {
     applyCurrentSlotBrightness();
   }
 
-  /// Kvällsläge: dim the whole screen right now, whatever the schedule says.
+  /// Dim the whole screen right now, whatever the schedule says.
   bool get isDimNow => _sharedPreferences.getBool(_dimNowEnabled) ?? false;
 
   /// Brightness (5-100 %) used while [isDimNow] is on.
@@ -207,7 +207,7 @@ class BrightnessService extends ChangeNotifier {
     }
   }
 
-  /// Applies what should show now: Kvällsläge first, then the schedule, otherwise full brightness.
+  /// Applies what should show now: dim-now first, then the schedule, otherwise full brightness.
   Future<void> applyCurrentSlotBrightness() async {
     // The quick panel (YouTube button) changes these settings from the native side.
     await _sharedPreferences.reload();
