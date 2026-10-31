@@ -14,6 +14,7 @@ import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -206,6 +207,7 @@ public class ArcAccessibilityService extends AccessibilityService {
 
     @Override
     protected boolean onKeyEvent(KeyEvent event) {
+        Log.d("ArcKeys", "key " + event.getKeyCode() + " action " + event.getAction() + " repeat " + event.getRepeatCount());
         if (event.getKeyCode() == KeyEvent.KEYCODE_HOME) return onHomeKey(event);
         int quickKey = (int) prefs(this).getLong(KEY_QUICK_KEY, KeyEvent.KEYCODE_UNKNOWN);
         boolean isQuickKey = event.getKeyCode() == quickKey
