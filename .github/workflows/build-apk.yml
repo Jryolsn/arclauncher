@@ -1,6 +1,9 @@
 name: Build APK
 
-# Jryolsn fork: builds a sideload APK on every push, for install on our TVs.
+# Jryolsn fork: builds a sideload APK on every push and publishes it as a GitHub release,
+# so Obtainium on the TVs can update the app:
+#   dev  -> pre-release  vX.Y.N-dev  (the test TV follows pre-releases)
+#   main -> release      vX.Y.N      (the main TV follows releases only)
 # Every build is signed with the same sideload key, so updates install over each other.
 on:
   push:
@@ -10,6 +13,9 @@ on:
 env:
   FLUTTER_VERSION: "3.41.9"
   VERSION_BASE: "1.3"
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -49,3 +55,22 @@ jobs:
           name: arc-launcher
           path: dist/*.apk
           if-no-files-found: error
+      - name: Publish release
+        if: github.ref_name == 'main' || github.ref_name == 'dev'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.name }}
+        run: |
+          prerelease=""
+          [ "$GITHUB_REF_NAME" = "main" ] || prerelease="--prerelease"
+          gh release create "v$VERSION" dist/*.apk $prerelease \
+            --target "$GITHUB_SHA" --title "Arc $VERSION" \
+            --notes "$(git log -1 --format=%B "$GITHUB_SHA")"
+      - name: Keep only the 10 newest pre-releases
+        if: github.ref_name == 'dev'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --limit 100 --json tagName,isPrerelease \
+            --jq '[.[] | select(.isPrerelease)] | .[10:] | .[].tagName' |
+          while read -r tag; do gh release delete "$tag" --yes --cleanup-tag; done
