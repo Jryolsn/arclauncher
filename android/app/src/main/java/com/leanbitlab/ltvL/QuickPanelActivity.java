@@ -144,7 +144,7 @@ public class QuickPanelActivity extends FlutterActivity {
 
     /** Leaving the app behind for anything else closes the panel, so it never lingers. */
     @Override
-    protected void onUserLeaveHint() {
+    public void onUserLeaveHint() {
         super.onUserLeaveHint();
         close();
     }
