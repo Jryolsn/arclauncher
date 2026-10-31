@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="arc_accessibility_description">Dims the screen on top of every app, and opens a quick brightness panel with the remote's YouTube button.</string>
+    <string name="arc_accessibility_description">Dims the screen on top of every app, and opens a quick brightness panel with the YouTube button on the remote.</string>
     <string name="arc_accessibility_label">Arc Brightness</string>
 </resources>
