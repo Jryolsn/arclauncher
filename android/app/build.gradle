@@ -64,7 +64,8 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.omeda.arc"
+        // Jryolsn fork: own package so upstream Arc updates never replace it.
+        applicationId "com.jryolsn.arc"
         compileSdk 36
         minSdkVersion flutter.minSdkVersion
         targetSdk 35
@@ -92,6 +93,13 @@ android {
                 storePassword storePass
                 keyAlias alias
                 keyPassword keyPass
+            } else if (System.getenv('SIDELOAD_SIGNING') == 'true') {
+                // Jryolsn fork: fixed, non-secret key for sideloading to our own TV, so every
+                // CI build can update the previous one in place.
+                storeFile file('sideload.keystore')
+                storePassword 'android'
+                keyAlias 'sideload'
+                keyPassword 'android'
             }
         }
     }
