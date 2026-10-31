@@ -387,7 +387,7 @@ class _LockedTabState extends State<_LockedTab> {
         FocusableSettingsTile(
           leading: const Icon(Icons.timer_outlined),
           title: Text('Stay unlocked: ${lock.relockOption.label}', style: Theme.of(context).textTheme.bodyMedium),
-          onPressed: () => _pickRelock(context, lock),
+          onPressed: () => pickRelock(context, lock),
         ),
         const SettingsSectionDivider(),
         if (apps.isEmpty)
@@ -424,7 +424,7 @@ Future<void> _pickLockType(BuildContext context, AppLockService lock) async {
 }
 
 /// PIN once, then a list of durations to pick from.
-Future<void> _pickRelock(BuildContext context, AppLockService lock) async {
+Future<void> pickRelock(BuildContext context, AppLockService lock) async {
   if (!await lock.verifyPin() || !context.mounted) return;
   final chosen = await showDialog<int>(
     context: context,

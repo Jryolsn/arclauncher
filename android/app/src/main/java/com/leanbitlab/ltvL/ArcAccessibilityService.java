@@ -12,17 +12,12 @@ import android.os.SystemClock;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
-import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
-import android.widget.Button;
-import android.widget.LinearLayout;
-import android.widget.TextView;
 
 /**
  * Two things that need to work on top of any app:
@@ -31,8 +26,8 @@ import android.widget.TextView;
  *    own Settings screens (ordinary app overlays are hidden there) and which may be fully opaque.
  * 3. The app lock: whenever a locked app comes to the front, however it was opened (Arc, voice search,
  *    recents, a link, casting from a phone), its sound is paused and the PIN screen covers it.
- * 2. A quick panel on a spare remote button (the YouTube button by default), so brightness can be changed
- *    without leaving the app that is open.
+ * 2. Opening the quick panel (QuickPanelActivity) by holding Home or with a spare remote button (the YouTube
+ *    button by default), so brightness and the lock can be changed without leaving the app that is open.
  *
  * Settings are shared with the Flutter side through its SharedPreferences file (keys start with "flutter.").
  */
@@ -46,12 +41,12 @@ public class ArcAccessibilityService extends AccessibilityService {
 
     /** Not darker than this, so the picture can never go fully black by mistake. */
     private static final int MAX_DARKNESS = 90;
-    private static final int STEP = 5;
 
     private static ArcAccessibilityService instance;
 
     /** Our own windows and system overlays that come and go on top of apps without "leaving" them. */
     private static final String PIN_SCREENS = "com.omeda.arc.Pin";
+    private static final String QUICK_PANEL = "com.omeda.arc.QuickPanel";
     private static final long RECHECK_MS = 30_000;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -74,9 +69,6 @@ public class ArcAccessibilityService extends AccessibilityService {
     };
 
     private View dimView;
-    private View panel;
-    private TextView valueText;
-    private Button toggleButton;
 
     /** Applies the dim layer if the service runs. Returns false when it isn't enabled. */
     static boolean applyDarkness(Context context, int darkness) {
@@ -106,6 +98,8 @@ public class ArcAccessibilityService extends AccessibilityService {
             registerReceiver(screenOff, new IntentFilter(Intent.ACTION_SCREEN_OFF));
         }
         handler.postDelayed(recheck, RECHECK_MS);
+        // Get the quick panel's engine going once things have settled, so holding Home opens it at once.
+        handler.postDelayed(() -> QuickPanelActivity.warmUp(this), 15_000);
     }
 
     @Override
@@ -130,7 +124,7 @@ public class ArcAccessibilityService extends AccessibilityService {
         String pkg = pkgName.toString();
         String cls = event.getClassName() == null ? "" : event.getClassName().toString();
         // The PIN screen itself, the status bar, keyboards and dialogs from "android" don't change the app.
-        if (cls.startsWith(PIN_SCREENS) || pkg.equals("com.android.systemui") || pkg.equals("android")
+        if (cls.startsWith(PIN_SCREENS) || cls.startsWith(QUICK_PANEL) || pkg.equals("com.android.systemui") || pkg.equals("android")
                 || cls.contains("InputMethod") || pkg.contains("inputmethod") || pkg.contains(".ime")) {
             return;
         }
@@ -214,7 +208,7 @@ public class ArcAccessibilityService extends AccessibilityService {
                 || (quickKey == KeyEvent.KEYCODE_UNKNOWN && isDefaultQuickKey(event.getKeyCode()));
         if (!isQuickKey) return false;
         if (event.getAction() == KeyEvent.ACTION_UP) {
-            if (panel == null) showPanel(); else hidePanel();
+            if (QuickPanelActivity.isShowing()) hidePanel(); else showPanel();
         }
         return true; // the button does nothing else while Arc owns it
     }
@@ -251,132 +245,21 @@ public class ArcAccessibilityService extends AccessibilityService {
         return keyCode == KeyEvent.KEYCODE_BUTTON_3 || keyCode == KeyEvent.KEYCODE_EXPLORER;
     }
 
+    /** Arc's quick settings (lib/quick_panel.dart), on top of the app that is open. */
     private void showPanel() {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(24), dp(20), dp(24), dp(20));
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(Color.argb(240, 30, 34, 40));
-        bg.setCornerRadius(dp(16));
-        box.setBackground(bg);
-
-        TextView title = new TextView(this);
-        title.setText("Brightness");
-        title.setTextColor(Color.WHITE);
-        title.setTextSize(22);
-        box.addView(title);
-
-        valueText = new TextView(this);
-        valueText.setTextColor(Color.WHITE);
-        valueText.setTextSize(18);
-        valueText.setPadding(0, dp(8), 0, dp(12));
-        box.addView(valueText);
-
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        Button darker = button("− Darker", v -> changeBrightness(-STEP));
-        Button lighter = button("+ Brighter", v -> changeBrightness(+STEP));
-        row.addView(darker);
-        row.addView(lighter);
-        box.addView(row);
-
-        toggleButton = button("", v -> {
-            SharedPreferences p = prefs(this);
-            p.edit().putBoolean(KEY_DIM_NOW, !p.getBoolean(KEY_DIM_NOW, false)).apply();
-            applyDimNow();
-        });
-        box.addView(toggleButton);
-        box.addView(button("Lock apps now", v -> {
-            AppLockStore.relockAll();
-            hidePanel();
-            if (foreground != null) checkLock(foreground);
-        }));
-        box.addView(button("All launcher settings", v -> {
-            hidePanel();
-            MainActivity.openSettingsOnResume = true;
-            startActivity(new Intent(this, MainActivity.class)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
-        }));
-        box.addView(button("Close", v -> hidePanel()));
-
-        box.setFocusable(true);
-        box.setOnKeyListener((v, keyCode, event) -> {
-            if (keyCode == KeyEvent.KEYCODE_BACK && event.getAction() == KeyEvent.ACTION_UP) {
-                hidePanel();
-                return true;
-            }
-            return false;
-        });
-
-        WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                dp(360),
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                PixelFormat.TRANSLUCENT);
-        params.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
-        params.x = dp(48);
-        panel = box;
-        getSystemService(WindowManager.class).addView(panel, params);
-        refreshPanel();
-        darker.requestFocus();
+        QuickPanelActivity.show(this);
     }
 
     private void hidePanel() {
-        if (panel != null) {
-            getSystemService(WindowManager.class).removeView(panel);
-            panel = null;
+        QuickPanelActivity.hide();
+    }
+
+    /** "Lock apps now" in the quick panel: everything locks again, including the app that is open. */
+    static void lockNow() {
+        AppLockStore.relockAll();
+        ArcAccessibilityService service = instance;
+        if (service != null && service.foreground != null) {
+            service.handler.postDelayed(() -> service.checkLock(service.foreground), 300);
         }
-    }
-
-    private Button button(String label, View.OnClickListener onClick) {
-        Button b = new Button(this);
-        b.setText(label);
-        b.setAllCaps(false);
-        b.setTextSize(16);
-        b.setOnClickListener(onClick);
-        b.setOnKeyListener((v, keyCode, event) -> {
-            if (keyCode == KeyEvent.KEYCODE_BACK) {
-                if (event.getAction() == KeyEvent.ACTION_UP) hidePanel();
-                return true;
-            }
-            return false;
-        });
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
-        lp.setMargins(0, dp(4), dp(4), 0);
-        b.setLayoutParams(lp);
-        return b;
-    }
-
-    /** Using the panel always means "dim now": it turns dimming on and changes its level. */
-    private void changeBrightness(int delta) {
-        SharedPreferences p = prefs(this);
-        int brightness = (int) p.getLong(KEY_DIM_NOW_BRIGHTNESS, 40);
-        brightness = Math.max(100 - MAX_DARKNESS, Math.min(100, brightness + delta));
-        p.edit().putLong(KEY_DIM_NOW_BRIGHTNESS, brightness).putBoolean(KEY_DIM_NOW, true).apply();
-        applyDimNow();
-    }
-
-    private void applyDimNow() {
-        SharedPreferences p = prefs(this);
-        boolean on = p.getBoolean(KEY_DIM_NOW, false);
-        int brightness = (int) p.getLong(KEY_DIM_NOW_BRIGHTNESS, 40);
-        int darkness = on ? 100 - brightness : 0;
-        p.edit().putLong(KEY_DARKNESS, darkness).apply();
-        setDarkness(darkness);
-        refreshPanel();
-    }
-
-    private void refreshPanel() {
-        if (panel == null) return;
-        SharedPreferences p = prefs(this);
-        boolean on = p.getBoolean(KEY_DIM_NOW, false);
-        int brightness = (int) p.getLong(KEY_DIM_NOW_BRIGHTNESS, 40);
-        valueText.setText(on ? "Dimmed to " + brightness + " %" : "Full brightness");
-        toggleButton.setText(on ? "Turn off dimming" : "Dim to " + brightness + " %");
-    }
-
-    private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 }

@@ -83,7 +83,27 @@ class FLauncherApp extends StatelessWidget
       ],
       supportedLocales: AppLocalizations.supportedLocales,
       title: 'FLauncher',
-        theme: ThemeData(
+        theme: arcTheme(accentColor),
+      home: Builder(
+        builder: (context) => PopScope(
+          canPop: false,
+          child: ExcludeSemantics(
+            child: FLauncher(),
+          ),
+          onPopInvoked: (didPop) {
+            LauncherState launcherState = context.read<LauncherState>();
+            launcherState.handleBackNavigation(context);
+          }
+        )
+      ),
+      );
+    });
+  }
+}
+
+/// Arc's dark theme, also used by the quick panel that opens on top of other apps.
+ThemeData arcTheme(Color accentColor) {
+  return ThemeData(
           useMaterial3: true,
           brightness: Brightness.dark,
           // Use ColorScheme based on accent color
@@ -141,20 +161,5 @@ class FLauncherApp extends StatelessWidget
               return null;
             }),
           ), tabBarTheme: TabBarThemeData(indicatorColor: accentColor),
-        ),
-      home: Builder(
-        builder: (context) => PopScope(
-          canPop: false,
-          child: ExcludeSemantics(
-            child: FLauncher(),
-          ),
-          onPopInvoked: (didPop) {
-            LauncherState launcherState = context.read<LauncherState>();
-            launcherState.handleBackNavigation(context);
-          }
-        )
-      ),
-      );
-    });
-  }
+        );
 }

@@ -117,7 +117,7 @@ class BrightnessSettingsPage extends StatelessWidget {
                       value: brightnessService.isDimNow,
                       onChanged: (value) => brightnessService.setDimNow(value),
                     ),
-                    _TimeSlotSlider(
+                    BrightnessSlider(
                       label: 'Screen brightness',
                       icon: Icons.nightlight,
                       isCurrentSlot: brightnessService.isDimNow,
@@ -151,7 +151,7 @@ class BrightnessSettingsPage extends StatelessWidget {
                       const SettingsSectionDivider(),
                       
                       // Time slot sliders
-                      ...TimeSlot.values.map((slot) => _TimeSlotSlider(
+                      ...TimeSlot.values.map((slot) => BrightnessSlider(
                         label: _slotLabel(localizations, slot),
                         icon: _iconForSlot(slot),
                         isCurrentSlot: slot == currentSlot,
@@ -211,14 +211,14 @@ class BrightnessSettingsPage extends StatelessWidget {
   }
 }
 
-class _TimeSlotSlider extends StatefulWidget {
+class BrightnessSlider extends StatefulWidget {
   final String label;
   final IconData icon;
   final bool isCurrentSlot;
   final int brightness;
   final ValueChanged<int> onChanged;
 
-  const _TimeSlotSlider({
+  const BrightnessSlider({
     required this.label,
     required this.icon,
     required this.isCurrentSlot,
@@ -227,10 +227,10 @@ class _TimeSlotSlider extends StatefulWidget {
   });
 
   @override
-  State<_TimeSlotSlider> createState() => _TimeSlotSliderState();
+  State<BrightnessSlider> createState() => BrightnessSliderState();
 }
 
-class _TimeSlotSliderState extends State<_TimeSlotSlider> {
+class BrightnessSliderState extends State<BrightnessSlider> {
   late double _value;
   bool _focused = false;
 
@@ -241,7 +241,7 @@ class _TimeSlotSliderState extends State<_TimeSlotSlider> {
   }
 
   @override
-  void didUpdateWidget(_TimeSlotSlider oldWidget) {
+  void didUpdateWidget(BrightnessSlider oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.brightness != widget.brightness) {
       _value = widget.brightness.toDouble();
