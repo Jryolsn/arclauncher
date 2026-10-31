@@ -1,0 +1,32 @@
+# Never disabled or removed. setup-tv.sh stops if any of these is in disable.txt or uninstall.txt.
+
+# Google Play and the framework
+com.google.android.gms                  # Google Play Services
+com.google.android.gsf                  # Google Services Framework
+com.android.vending                     # Play Store
+com.google.android.webview
+
+# Settings and system
+android
+com.android.systemui
+com.android.tv.settings                 # Settings
+com.android.providers.settings
+com.android.shell                       # adb shell itself
+com.google.android.packageinstaller
+com.google.android.permissioncontroller
+com.android.bluetooth.chromecast
+com.google.android.bluetooth
+com.google.android.tv.dfuservice        # remote firmware updates
+com.google.android.inputmethod.latin    # Gboard (on-screen keyboard)
+
+# Features we keep
+com.google.android.katniss              # Google Assistant / voice search
+com.google.android.apps.mediashell      # the Cast receiver
+com.google.android.tv.remote.service    # remote control from the phone
+com.google.android.tv.axel              # remote pairing, TV control
+com.netflix.tokenmanager
+
+# Our launcher and helpers
+com.jryolsn.arc
+com.thayford.castfix
+com.motionplay.tv

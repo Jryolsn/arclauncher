@@ -1,0 +1,9 @@
+# Removed. Apps installed by the user/Play are uninstalled for good (reinstall from Play Store);
+# preinstalled system apps are removed for the user (pm uninstall --user 0) and come back with restore-tv.sh.
+com.netflix.ninja
+com.amazon.amazonvideo.livingroom
+com.motionplay.phone                            # "Motion Play" (keep "Motion Play TV", com.motionplay.tv)
+com.google.android.play.games
+com.google.android.videos
+com.omeda.arc                                   # upstream Arc, if it was installed for testing
+com.jryolsn.tvlauncher                          # our old launcher

@@ -1,0 +1,18 @@
+# Disabled (pm disable-user --user 0): they stay on the device but never run. Undone by restore-tv.sh.
+# Base: Clean Your TV's list for the Chromecast with Google TV HD (boreal), MIT licence,
+# https://github.com/Gathin23/cleanyourtv/blob/main/examples/google-chromecast-gtv-hd/debloat.txt
+
+# Telemetry, feedback and ads
+com.google.android.feedback
+com.android.tv.feedbackconsent
+com.google.android.tv.remotecontrol.logging
+com.google.android.federatedcompute
+com.google.android.ondevicepersonalization.services
+com.google.android.adservices.api
+com.google.android.ext.adservices.api
+android.autoinstalls.config.google.gtvpai       # Play Auto Installs, only read during first setup
+
+# Preinstalled apps
+com.google.android.play.games
+com.google.android.videos                       # Google TV / Play Movies
+com.android.printspooler
