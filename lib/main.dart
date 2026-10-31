@@ -34,6 +34,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'flauncher_app.dart';
+// The quick panel's entry point (quickPanelMain) has to be part of the app to be found at runtime.
+export 'quick_panel.dart' show quickPanelMain;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

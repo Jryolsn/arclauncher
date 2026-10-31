@@ -103,7 +103,7 @@ public class QuickPanelActivity extends FlutterActivity {
         });
 
         String bundle = FlutterInjector.instance().flutterLoader().findAppBundlePath();
-        engine.getDartExecutor().executeDartEntrypoint(new DartExecutor.DartEntrypoint(bundle, "quickPanelMain"));
+        engine.getDartExecutor().executeDartEntrypoint(new DartExecutor.DartEntrypoint(bundle, "package:flauncher/quick_panel.dart", "quickPanelMain"));
         return engine;
     }
 
