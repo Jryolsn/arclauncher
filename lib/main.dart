@@ -16,6 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import 'package:flauncher/providers/app_lock_service.dart';
 import 'dart:async';
 
 import 'package:flauncher/database.dart';
@@ -56,6 +57,7 @@ Future<void> main() async {
               return WallpaperService(settingsService);
             }
         ),
+        ChangeNotifierProvider(create: (_) => AppLockService()),
         ChangeNotifierProvider(
             create: (_) => BrightnessService(sharedPreferences),
             lazy: false

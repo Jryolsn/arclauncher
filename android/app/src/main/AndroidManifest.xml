@@ -112,6 +112,23 @@
                 android:resource="@xml/screensaver" />
         </service>
 
+        <!-- App lock PIN screens. The gate runs in its own task, so the locked app shows again after the PIN. -->
+        <activity
+            android:name=".PinActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:screenOrientation="landscape"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen" />
+        <activity
+            android:name=".PinGateActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:taskAffinity="${applicationId}.lock"
+            android:noHistory="true"
+            android:screenOrientation="landscape"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen" />
+
         <service
             android:name=".ArcAccessibilityService"
             android:exported="true"

@@ -17,6 +17,7 @@
  */
 
 
+import 'package:flauncher/providers/app_lock_service.dart';
 import 'package:flauncher/providers/apps_service.dart';
 
 import 'package:flauncher/widgets/ensure_visible.dart';
@@ -49,6 +50,7 @@ class _ApplicationsPanelPageState extends State<ApplicationsPanelPage> {
     _TabData(0, Icons.apps, (l) => l.allApplications),
     _TabData(1, Icons.star, (l) => l.favoriteApps),
     _TabData(2, Icons.visibility_off_outlined, (l) => l.hiddenApplications),
+    _TabData(3, Icons.lock_outline, (_) => 'Locked apps'),
   ];
   
   late List<FocusNode> _tabFocusNodes;
@@ -221,6 +223,7 @@ class _ApplicationsPanelPageState extends State<ApplicationsPanelPage> {
       case 0: return _AllAppsTab();
       case 1: return _FavoritesTab();
       case 2: return _HiddenTab();
+      case 3: return _LockedTab();
       default: return Container();
     }
   }
@@ -336,6 +339,77 @@ class _HiddenTab extends StatelessWidget {
                 .toList(),
           );
         },
+      );
+}
+
+class _LockedTab extends StatefulWidget {
+  @override
+  State<_LockedTab> createState() => _LockedTabState();
+}
+
+class _LockedTabState extends State<_LockedTab> {
+  @override
+  void initState() {
+    super.initState();
+    // The lock can change from outside this page (PIN screen, Android settings).
+    context.read<AppLockService>().refresh();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lock = context.watch<AppLockService>();
+    final apps = context.watch<AppsService>().applications.where((app) => lock.isLocked(app.packageName)).toList();
+    return ListView(
+      children: [
+        if (!lock.isActive)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: Text(
+              "App lock is off: turn on \"Arc Brightness\" in Android Settings > Accessibility.",
+              style: TextStyle(color: Colors.orangeAccent),
+            ),
+          ),
+        _FirstRow(
+          child: FocusableSettingsTile(
+            autofocus: true,
+            leading: const Icon(Icons.pin_outlined),
+            title: Text(lock.hasPin ? 'Change PIN' : 'Set PIN', style: Theme.of(context).textTheme.bodyMedium),
+            onPressed: lock.changePin,
+          ),
+        ),
+        FocusableSettingsTile(
+          leading: const Icon(Icons.timer_outlined),
+          title: Text('Stay unlocked: ${lock.relockOption.label}', style: Theme.of(context).textTheme.bodyMedium),
+          onPressed: lock.cycleRelock,
+        ),
+        const SettingsSectionDivider(),
+        if (apps.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text('No locked apps. Open an app here and choose Lock.', style: TextStyle(color: Colors.white60)),
+          ),
+        ...apps.map((app) => EnsureVisible(alignment: 0.5, child: _AppListItem(app))),
+      ],
+    );
+  }
+}
+
+/// Up from the first row goes back to the tabs, like the other lists.
+class _FirstRow extends StatelessWidget {
+  final Widget child;
+  const _FirstRow({required this.child});
+
+  @override
+  Widget build(BuildContext context) => Focus(
+        canRequestFocus: false,
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp) {
+            Actions.invoke(context, const MoveFocusToTabIntent());
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: child,
       );
 }
 

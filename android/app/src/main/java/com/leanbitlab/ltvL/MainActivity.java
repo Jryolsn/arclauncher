@@ -79,6 +79,17 @@ public class MainActivity extends FlutterActivity {
     private static final String PERMISSION_READ_TV_LISTINGS = "android.permission.READ_TV_LISTINGS";
     private static final int REQUEST_CODE_READ_TV_LISTINGS = 1001;
     private static final String COLUMN_ASPECT_RATIO = "aspect_ratio";
+    private static final int REQUEST_PIN = 2001;
+    private MethodChannel.Result pendingPinResult;
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_PIN && pendingPinResult != null) {
+            pendingPinResult.success(resultCode == RESULT_OK);
+            pendingPinResult = null;
+        }
+    }
 
     @Override
     public void configureFlutterEngine(@NonNull FlutterEngine flutterEngine) {
@@ -144,6 +155,24 @@ public class MainActivity extends FlutterActivity {
                 case "setSystemBrightness" -> {
                     int brightness = call.argument("brightness");
                     result.success(setSystemBrightness(brightness));
+                }
+                case "appLockGetLocked" -> result.success(new ArrayList<>(AppLockStore.lockedPackages(this)));
+                case "appLockSetLocked" -> {
+                    AppLockStore.setLocked(this, call.argument("packageName"), Boolean.TRUE.equals(call.argument("locked")));
+                    result.success(true);
+                }
+                case "appLockHasPin" -> result.success(AppLockStore.hasPin(this));
+                case "appLockIsActive" -> result.success(ArcAccessibilityService.isRunning());
+                case "appLockGetRelockMinutes" -> result.success(AppLockStore.relockMinutes(this));
+                case "appLockSetRelockMinutes" -> {
+                    AppLockStore.setRelockMinutes(this, call.<Integer>argument("minutes"));
+                    result.success(true);
+                }
+                case "appLockRequestPin" -> {
+                    if (pendingPinResult != null) pendingPinResult.success(false);
+                    pendingPinResult = result;
+                    int mode = "set".equals(call.argument("mode")) ? PinActivity.MODE_SET : PinActivity.MODE_VERIFY;
+                    startActivityForResult(new Intent(this, PinActivity.class).putExtra(PinActivity.EXTRA_MODE, mode), REQUEST_PIN);
                 }
                 case "setDimLevel" -> result.success(DimOverlayService.apply(this, call.<Integer>argument("darkness")));
                 case "canDrawOverlays" -> result.success(Settings.canDrawOverlays(this));
@@ -416,6 +445,14 @@ public class MainActivity extends FlutterActivity {
     }
 
     private boolean launchApp(String packageName) {
+        // A locked app asks for the PIN first, so it never flashes up before the lock screen.
+        if (AppLockStore.isLocked(this, packageName) && !AppLockStore.isUnlocked(this, packageName)
+                && AppLockStore.hasPin(this)) {
+            return tryStartActivity(new Intent(this, PinGateActivity.class)
+                    .putExtra(PinActivity.EXTRA_MODE, PinActivity.MODE_GATE)
+                    .putExtra(PinActivity.EXTRA_PACKAGE, packageName)
+                    .putExtra(PinActivity.EXTRA_LAUNCH, true));
+        }
         PackageManager packageManager = getPackageManager();
         Intent intent = packageManager.getLeanbackLaunchIntentForPackage(packageName);
 

@@ -1,4 +1,5 @@
 
+import 'package:flauncher/providers/app_lock_service.dart';
 import 'dart:typed_data';
 
 import 'package:flauncher/models/app.dart';
@@ -22,6 +23,7 @@ class AppDetailsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     AppLocalizations localizations = AppLocalizations.of(context)!;
     AppsService appsService = context.watch<AppsService>();
+    AppLockService appLock = context.watch<AppLockService>();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -88,6 +90,12 @@ class AppDetailsPage extends StatelessWidget {
                      appsService.hideApplication(application);
                    }
                 },
+              ),
+              _buildListTile(
+                context,
+                icon: appLock.isLocked(application.packageName) ? Icons.lock_open : Icons.lock_outline,
+                title: appLock.isLocked(application.packageName) ? 'Unlock' : 'Lock',
+                onTap: () => appLock.toggleLock(application.packageName),
               ),
               if (!application.hidden)
                 _buildListTile(

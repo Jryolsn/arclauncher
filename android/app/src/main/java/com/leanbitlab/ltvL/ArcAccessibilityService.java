@@ -1,8 +1,14 @@
 package com.omeda.arc;
 
 import android.accessibilityservice.AccessibilityService;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.media.AudioManager;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
@@ -22,6 +28,8 @@ import android.widget.TextView;
  *
  * 1. The dim layer. Drawn as an accessibility overlay, which Android does not hide over its
  *    own Settings screens (ordinary app overlays are hidden there) and which may be fully opaque.
+ * 3. The app lock: whenever a locked app comes to the front, however it was opened (Arc, voice search,
+ *    recents, a link, casting from a phone), its sound is paused and the PIN screen covers it.
  * 2. A quick panel on a spare remote button (the YouTube button by default), so brightness can be changed
  *    without leaving the app that is open.
  *
@@ -40,6 +48,29 @@ public class ArcAccessibilityService extends AccessibilityService {
     private static final int STEP = 5;
 
     private static ArcAccessibilityService instance;
+
+    /** Our own windows and system overlays that come and go on top of apps without "leaving" them. */
+    private static final String PIN_SCREENS = "com.omeda.arc.Pin";
+    private static final long RECHECK_MS = 30_000;
+
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private String foreground;
+    private String gatedPackage;
+    private long gatedAt;
+    private final BroadcastReceiver screenOff = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            AppLockStore.relockAll();
+        }
+    };
+    /** Timed unlocks run out while the app is still open, so check again now and then. */
+    private final Runnable recheck = new Runnable() {
+        @Override
+        public void run() {
+            if (foreground != null) checkLock(foreground);
+            handler.postDelayed(this, RECHECK_MS);
+        }
+    };
 
     private View dimView;
     private View panel;
@@ -68,10 +99,22 @@ public class ArcAccessibilityService extends AccessibilityService {
         // The accessibility layer replaces the ordinary overlay, which Settings would hide.
         stopService(new Intent(this, DimOverlayService.class));
         setDarkness((int) prefs(this).getLong(KEY_DARKNESS, 0));
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(screenOff, new IntentFilter(Intent.ACTION_SCREEN_OFF), Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(screenOff, new IntentFilter(Intent.ACTION_SCREEN_OFF));
+        }
+        handler.postDelayed(recheck, RECHECK_MS);
     }
 
     @Override
     public boolean onUnbind(Intent intent) {
+        handler.removeCallbacks(recheck);
+        try {
+            unregisterReceiver(screenOff);
+        } catch (IllegalArgumentException ignored) {
+            // not registered
+        }
         removeDim();
         hidePanel();
         instance = null;
@@ -80,6 +123,44 @@ public class ArcAccessibilityService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
+        if (event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return;
+        CharSequence pkgName = event.getPackageName();
+        if (pkgName == null) return;
+        String pkg = pkgName.toString();
+        String cls = event.getClassName() == null ? "" : event.getClassName().toString();
+        // The PIN screen itself, the status bar, keyboards and dialogs from "android" don't change the app.
+        if (cls.startsWith(PIN_SCREENS) || pkg.equals("com.android.systemui") || pkg.equals("android")
+                || cls.contains("InputMethod") || pkg.contains("inputmethod") || pkg.contains(".ime")) {
+            return;
+        }
+        if (!pkg.equals(foreground)) {
+            foreground = pkg;
+            AppLockStore.onAppLeft(this, pkg);
+        }
+        checkLock(pkg);
+    }
+
+    private void checkLock(String pkg) {
+        if (!AppLockStore.isLocked(this, pkg) || !AppLockStore.hasPin(this)
+                || AppLockStore.isUnlocked(this, pkg)) {
+            return;
+        }
+        long now = SystemClock.elapsedRealtime();
+        if (pkg.equals(gatedPackage) && now - gatedAt < 1_500) return; // PIN screen already on its way
+        gatedPackage = pkg;
+        gatedAt = now;
+        pauseMedia();
+        startActivity(new Intent(this, PinGateActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                .putExtra(PinActivity.EXTRA_MODE, PinActivity.MODE_GATE)
+                .putExtra(PinActivity.EXTRA_PACKAGE, pkg));
+    }
+
+    /** Stops video and music in the app behind the PIN screen. */
+    private void pauseMedia() {
+        AudioManager audio = getSystemService(AudioManager.class);
+        audio.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PAUSE));
+        audio.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PAUSE));
     }
 
     @Override
