@@ -27,6 +27,7 @@ class BackButtonActionPage extends StatelessWidget {
                     _radioTile(context, service, localizations.dialogOptionBackButtonActionDoNothing, ""),
                     _radioTile(context, service, localizations.dialogOptionBackButtonActionShowClock, BACK_BUTTON_ACTION_CLOCK),
                     _radioTile(context, service, localizations.dialogOptionBackButtonActionShowScreensaver, BACK_BUTTON_ACTION_SCREENSAVER),
+                    _radioTile(context, service, 'Kvällsläge av/på', BACK_BUTTON_ACTION_DIM),
                   ],
                 ),
               ),

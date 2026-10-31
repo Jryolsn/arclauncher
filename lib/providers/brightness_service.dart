@@ -30,6 +30,8 @@ const _brightnessDay = "brightness_day";             // 9am - 3pm
 const _brightnessAfternoon = "brightness_afternoon"; // 3pm - 6pm
 const _brightnessEvening = "brightness_evening";     // 6pm - 10pm
 const _brightnessNight = "brightness_night";         // 10pm - 6am
+const _dimNowEnabled = "dim_now_enabled";
+const _dimNowBrightness = "dim_now_brightness";
 
 /// Time slot definitions
 enum TimeSlot {
@@ -86,11 +88,32 @@ class BrightnessService extends ChangeNotifier {
     if (isEnabled) {
       _startScheduler();
     }
+    applyCurrentSlotBrightness();
+  }
+
+  /// Kvällsläge: dim the whole screen right now, whatever the schedule says.
+  bool get isDimNow => _sharedPreferences.getBool(_dimNowEnabled) ?? false;
+
+  /// Brightness (5-100 %) used while [isDimNow] is on.
+  int get dimNowBrightness => _sharedPreferences.getInt(_dimNowBrightness) ?? 40;
+
+  Future<void> setDimNow(bool enabled) async {
+    await _sharedPreferences.setBool(_dimNowEnabled, enabled);
+    notifyListeners();
+    await applyCurrentSlotBrightness();
+  }
+
+  Future<void> toggleDimNow() => setDimNow(!isDimNow);
+
+  Future<void> setDimNowBrightness(int brightness) async {
+    await _sharedPreferences.setInt(_dimNowBrightness, brightness);
+    notifyListeners();
+    if (isDimNow) await _applyBrightness(brightness);
   }
 
   Future<void> checkPermission() async {
     try {
-      final bool result = await _platform.invokeMethod('checkWriteSettingsPermission');
+      final bool result = await _platform.invokeMethod('canDrawOverlays');
       _hasPermission = result;
     } catch (e) {
       debugPrint('Error checking brightness permission: $e');
@@ -101,7 +124,7 @@ class BrightnessService extends ChangeNotifier {
 
   Future<void> requestPermission() async {
     try {
-      await _platform.invokeMethod('requestWriteSettingsPermission');
+      await _platform.invokeMethod('requestOverlayPermission');
     } catch (e) {
       debugPrint('Error requesting brightness permission: $e');
     }
@@ -147,7 +170,7 @@ class BrightnessService extends ChangeNotifier {
     notifyListeners();
     
     // Apply immediately if this is the current slot and scheduler is enabled
-    if (isEnabled && getCurrentTimeSlot() == slot) {
+    if (isEnabled && !isDimNow && getCurrentTimeSlot() == slot) {
       await _applyBrightness(brightness);
     }
   }
@@ -161,12 +184,7 @@ class BrightnessService extends ChangeNotifier {
       await applyCurrentSlotBrightness();
     } else {
       _stopScheduler();
-      // Reset to system brightness
-      try {
-        await ScreenBrightness().resetScreenBrightness();
-      } catch (e) {
-        debugPrint('Error resetting brightness: $e');
-      }
+      await applyCurrentSlotBrightness();
     }
     
     notifyListeners();
@@ -189,24 +207,25 @@ class BrightnessService extends ChangeNotifier {
     }
   }
 
+  /// Applies what should show now: Kvällsläge first, then the schedule, otherwise full brightness.
   Future<void> applyCurrentSlotBrightness() async {
-    if (!isEnabled) return;
-    
-    final currentSlot = getCurrentTimeSlot();
-    final brightness = getBrightnessForSlot(currentSlot);
-    await _applyBrightness(brightness);
+    if (isDimNow) {
+      await _applyBrightness(dimNowBrightness);
+    } else if (isEnabled) {
+      await _applyBrightness(getBrightnessForSlot(getCurrentTimeSlot()));
+    } else {
+      await _applyBrightness(100);
+    }
   }
 
+  /// A Chromecast has no backlight (HDMI), so dimming is a dark layer drawn over every app.
   Future<void> _applyBrightness(int brightnessPct) async {
     try {
-      // 1. Try system-wide brightness first (needs WRITE_SETTINGS)
-      final int brightnessValue255 = ((brightnessPct / 100.0) * 255).round();
-      final bool success = await _platform.invokeMethod('setSystemBrightness', {'brightness': brightnessValue255});
-      
-      if (!success) {
-        // 2. Fallback to app-level brightness
-        final brightnessValue = brightnessPct / 100.0;
-        await ScreenBrightness().setScreenBrightness(brightnessValue);
+      final darkness = (100 - brightnessPct).clamp(0, 90);
+      final bool ok = await _platform.invokeMethod('setDimLevel', {'darkness': darkness});
+      if (!ok && _hasPermission) {
+        _hasPermission = false;
+        notifyListeners();
       }
     } catch (e) {
       debugPrint('Error setting brightness ($brightnessPct%): $e');

@@ -42,6 +42,10 @@
 
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+    <!-- Kvällsläge: dark layer over all apps -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <queries>
         <intent>
@@ -106,6 +110,15 @@
             <meta-data
                 android:name="android.service.dream"
                 android:resource="@xml/screensaver" />
+        </service>
+
+        <service
+            android:name=".DimOverlayService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Dims the whole screen with an overlay; HDMI devices have no backlight control" />
         </service>
 
         <meta-data

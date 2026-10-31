@@ -145,6 +145,12 @@ public class MainActivity extends FlutterActivity {
                     int brightness = call.argument("brightness");
                     result.success(setSystemBrightness(brightness));
                 }
+                case "setDimLevel" -> result.success(DimOverlayService.apply(this, call.<Integer>argument("darkness")));
+                case "canDrawOverlays" -> result.success(Settings.canDrawOverlays(this));
+                case "requestOverlayPermission" -> {
+                    Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()));
+                    result.success(tryStartActivity(intent));
+                }
                 case "openWifiSettings" -> result.success(openWifiSettings());
                 case "getMediaStoreImages" -> result.success(getMediaStoreImages());
                 case "getMediaStoreVideos" -> result.success(getMediaStoreVideos());

@@ -80,7 +80,7 @@ class BrightnessSettingsPage extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: SelectableText(
-                                  'adb shell appops set com.omeda.arc WRITE_SETTINGS allow', // Command for Manual Grant
+                                  'adb shell appops set com.jryolsn.arc SYSTEM_ALERT_WINDOW allow', // Command for Manual Grant
                                   style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
                                 ),
                               ),
@@ -106,9 +106,28 @@ class BrightnessSettingsPage extends StatelessWidget {
                         ),
                       ),
                       
-                    // Enable/Disable toggle
+                    // Kvällsläge: dim everything right now
                     RoundedSwitchListTile(
                       autofocus: true,
+                      title: Text(
+                        'Kvällsläge (dimma allt nu)',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      secondary: Icon(brightnessService.isDimNow ? Icons.nightlight : Icons.nightlight_outlined),
+                      value: brightnessService.isDimNow,
+                      onChanged: (value) => brightnessService.setDimNow(value),
+                    ),
+                    _TimeSlotSlider(
+                      label: 'Ljusstyrka i kvällsläge',
+                      icon: Icons.nightlight,
+                      isCurrentSlot: brightnessService.isDimNow,
+                      brightness: brightnessService.dimNowBrightness,
+                      onChanged: (value) => brightnessService.setDimNowBrightness(value),
+                    ),
+                    const SettingsSectionDivider(),
+
+                    // Enable/Disable toggle
+                    RoundedSwitchListTile(
                       title: Text(
                         localizations.enableBrightnessScheduler,
                         style: Theme.of(context).textTheme.bodyMedium,
@@ -133,7 +152,8 @@ class BrightnessSettingsPage extends StatelessWidget {
                       
                       // Time slot sliders
                       ...TimeSlot.values.map((slot) => _TimeSlotSlider(
-                        slot: slot,
+                        label: _slotLabel(localizations, slot),
+                        icon: _iconForSlot(slot),
                         isCurrentSlot: slot == currentSlot,
                         brightness: brightnessService.getBrightnessForSlot(slot),
                         onChanged: (value) => brightnessService.setBrightnessForSlot(slot, value),
@@ -192,13 +212,15 @@ class BrightnessSettingsPage extends StatelessWidget {
 }
 
 class _TimeSlotSlider extends StatefulWidget {
-  final TimeSlot slot;
+  final String label;
+  final IconData icon;
   final bool isCurrentSlot;
   final int brightness;
   final ValueChanged<int> onChanged;
 
   const _TimeSlotSlider({
-    required this.slot,
+    required this.label,
+    required this.icon,
     required this.isCurrentSlot,
     required this.brightness,
     required this.onChanged,
@@ -236,7 +258,6 @@ class _TimeSlotSliderState extends State<_TimeSlotSlider> {
 
   @override
   Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context)!;
     return Actions(
       actions: <Type, Action<Intent>>{
         // Intercept left/right to control slider, let up/down pass through for navigation
@@ -286,7 +307,7 @@ class _TimeSlotSliderState extends State<_TimeSlotSlider> {
                   Row(
                     children: [
                       Icon(
-                        _getIconForSlot(widget.slot),
+                        widget.icon,
                         size: 18,
                         color: widget.isCurrentSlot 
                             ? Theme.of(context).colorScheme.primary 
@@ -294,7 +315,7 @@ class _TimeSlotSliderState extends State<_TimeSlotSlider> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        _slotLabel(localizations, widget.slot),
+                        widget.label,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           fontWeight: widget.isCurrentSlot ? FontWeight.bold : FontWeight.normal,
                           color: widget.isCurrentSlot 
@@ -339,7 +360,9 @@ class _TimeSlotSliderState extends State<_TimeSlotSlider> {
     );
   }
 
-  IconData _getIconForSlot(TimeSlot slot) {
+}
+
+IconData _iconForSlot(TimeSlot slot) {
     switch (slot) {
       case TimeSlot.morning:
         return Icons.wb_twilight;
@@ -351,7 +374,6 @@ class _TimeSlotSliderState extends State<_TimeSlotSlider> {
         return Icons.nights_stay;
       case TimeSlot.night:
         return Icons.bedtime;
-    }
   }
 }
 

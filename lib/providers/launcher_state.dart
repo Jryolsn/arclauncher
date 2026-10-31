@@ -16,6 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import 'package:flauncher/providers/brightness_service.dart';
 import 'package:flauncher/providers/settings_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -70,6 +71,9 @@ class LauncherState extends ChangeNotifier
           break;
         case BACK_BUTTON_ACTION_SCREENSAVER:
           appsService.startAmbientMode();
+          break;
+        case BACK_BUTTON_ACTION_DIM:
+          context.read<BrightnessService>().toggleDimNow();
           break;
       }
     }
