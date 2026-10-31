@@ -37,6 +37,8 @@ jobs:
           suffix=""
           [ "$GITHUB_REF_NAME" = "main" ] || suffix="-dev"
           echo "name=${VERSION_BASE}.${GITHUB_RUN_NUMBER}${suffix}" >> "$GITHUB_OUTPUT"
+          # Above the upstream versionCode (4128) that earlier builds carried, so updates are never downgrades.
+          echo "code=$((5000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_OUTPUT"
       - run: flutter pub get
       - name: Build release APK (no self-updater)
         env:
@@ -45,7 +47,7 @@ jobs:
         run: >
           flutter build apk --release --flavor github
           --build-name=${{ steps.version.outputs.name }}
-          --build-number=${{ github.run_number }}
+          --build-number=${{ steps.version.outputs.code }}
       - name: Rename APK
         run: |
           mkdir -p dist
