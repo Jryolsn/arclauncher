@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared helpers for the TV scripts. Sourced, not run.
 # shellcheck disable=SC2034  # used by the scripts that source this file
 #
