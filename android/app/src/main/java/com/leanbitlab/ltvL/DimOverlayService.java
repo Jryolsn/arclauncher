@@ -34,6 +34,8 @@ public class DimOverlayService extends Service {
 
     /** darkness 0 (off) to 90 percent. Returns false if the app may not draw over other apps. */
     static boolean apply(Context context, int darkness) {
+        // Preferred: the accessibility layer, which also covers Android's own Settings screens.
+        if (ArcAccessibilityService.applyDarkness(context, darkness)) return true;
         Intent intent = new Intent(context, DimOverlayService.class);
         if (darkness <= 0) {
             context.stopService(intent);

@@ -48,7 +48,7 @@ class GeneralSettingsPage extends StatelessWidget {
                   showChevron: true,
                   autofocus: true,
                   leading: const Icon(Icons.brightness_6),
-                  title: Text(localizations.brightnessScheduler, style: Theme.of(context).textTheme.bodyMedium),
+                  title: Text('Ljusstyrka', style: Theme.of(context).textTheme.bodyMedium),
                   onPressed: () => Navigator.of(context).pushNamed(BrightnessSettingsPage.routeName),
                 ),
                 FocusableSettingsTile(

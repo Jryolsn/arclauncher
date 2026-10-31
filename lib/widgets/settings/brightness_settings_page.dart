@@ -39,7 +39,7 @@ class BrightnessSettingsPage extends StatelessWidget {
 
         return Column(
           children: [
-            SettingsPageHeader(title: localizations.brightnessScheduler),
+            SettingsPageHeader(title: 'Ljusstyrka'),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -110,7 +110,7 @@ class BrightnessSettingsPage extends StatelessWidget {
                     RoundedSwitchListTile(
                       autofocus: true,
                       title: Text(
-                        'Kvällsläge (dimma allt nu)',
+                        'Tona ned skärmen nu',
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       secondary: Icon(brightnessService.isDimNow ? Icons.nightlight : Icons.nightlight_outlined),
@@ -118,7 +118,7 @@ class BrightnessSettingsPage extends StatelessWidget {
                       onChanged: (value) => brightnessService.setDimNow(value),
                     ),
                     _TimeSlotSlider(
-                      label: 'Ljusstyrka i kvällsläge',
+                      label: 'Ljusstyrka när nedtonad',
                       icon: Icons.nightlight,
                       isCurrentSlot: brightnessService.isDimNow,
                       brightness: brightnessService.dimNowBrightness,
