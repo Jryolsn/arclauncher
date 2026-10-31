@@ -31,6 +31,8 @@ public class QuickPanelActivity extends FlutterActivity {
 
     private static FlutterEngine engine;
     private static QuickPanelActivity current;
+    /** Set once the Dart side has drawn; until then the see-through window would show nothing. */
+    private static volatile boolean dartReady;
     private MethodChannel.Result pendingPinResult;
 
     static boolean isShowing() {
@@ -56,6 +58,10 @@ public class QuickPanelActivity extends FlutterActivity {
         new MethodChannel(messenger, "arc/quick_panel").setMethodCallHandler((call, result) -> {
             QuickPanelActivity panel = current;
             switch (call.method) {
+                case "ready" -> {
+                    dartReady = true;
+                    result.success(null);
+                }
                 case "close" -> {
                     if (panel != null) panel.close();
                     result.success(null);
@@ -130,6 +136,13 @@ public class QuickPanelActivity extends FlutterActivity {
         current = this;
         // Fresh values and focus on the first row. Only here: coming back from the PIN screen keeps the state.
         new MethodChannel(engine.getDartExecutor().getBinaryMessenger(), "arc/quick_panel").invokeMethod("shown", null);
+        // Never leave an invisible window that swallows the remote: close if Flutter hasn't come up.
+        getWindow().getDecorView().postDelayed(() -> {
+            if (!dartReady) {
+                android.util.Log.w("ArcQuickPanel", "Flutter did not start, closing the panel");
+                close();
+            }
+        }, 4000);
     }
 
     @Override

@@ -59,6 +59,7 @@ Future<void> quickPanelMain() async {
     ],
     child: const _QuickPanelApp(),
   ));
+  WidgetsBinding.instance.addPostFrameCallback((_) => _panelChannel.invokeMethod('ready'));
 }
 
 Future<void> _close() => _panelChannel.invokeMethod('close');
