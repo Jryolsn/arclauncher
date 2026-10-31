@@ -206,6 +206,7 @@ public class ArcAccessibilityService extends AccessibilityService {
 
     @Override
     protected boolean onKeyEvent(KeyEvent event) {
+        if (event.getKeyCode() == KeyEvent.KEYCODE_HOME) return onHomeKey(event);
         int quickKey = (int) prefs(this).getLong(KEY_QUICK_KEY, KeyEvent.KEYCODE_UNKNOWN);
         boolean isQuickKey = event.getKeyCode() == quickKey
                 || (quickKey == KeyEvent.KEYCODE_UNKNOWN && isDefaultQuickKey(event.getKeyCode()));
@@ -214,6 +215,33 @@ public class ArcAccessibilityService extends AccessibilityService {
             if (panel == null) showPanel(); else hidePanel();
         }
         return true; // the button does nothing else while Arc owns it
+    }
+
+    private static final long LONG_PRESS_MS = 600;
+    private boolean homeLongPressed;
+    private final Runnable homeLongPress = () -> {
+        homeLongPressed = true;
+        showPanel();
+    };
+
+    /**
+     * Holding Home opens the quick panel; a normal press still goes home (sent on release instead,
+     * since we can't tell the two apart before then).
+     */
+    private boolean onHomeKey(KeyEvent event) {
+        if (event.getAction() == KeyEvent.ACTION_DOWN) {
+            if (event.getRepeatCount() == 0) {
+                homeLongPressed = false;
+                handler.postDelayed(homeLongPress, LONG_PRESS_MS);
+            }
+        } else if (event.getAction() == KeyEvent.ACTION_UP) {
+            handler.removeCallbacks(homeLongPress);
+            if (!homeLongPressed) {
+                hidePanel();
+                performGlobalAction(GLOBAL_ACTION_HOME);
+            }
+        }
+        return true;
     }
 
     /** The Chromecast remote's YouTube button, which does nothing once Google's home screen is off. */
@@ -256,6 +284,17 @@ public class ArcAccessibilityService extends AccessibilityService {
             applyDimNow();
         });
         box.addView(toggleButton);
+        box.addView(button("Lock apps now", v -> {
+            AppLockStore.relockAll();
+            hidePanel();
+            if (foreground != null) checkLock(foreground);
+        }));
+        box.addView(button("All launcher settings", v -> {
+            hidePanel();
+            MainActivity.openSettingsOnResume = true;
+            startActivity(new Intent(this, MainActivity.class)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
+        }));
         box.addView(button("Close", v -> hidePanel()));
 
         box.setFocusable(true);

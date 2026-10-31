@@ -24,7 +24,11 @@ import 'dart:ui' as ui;
 import 'package:collection/collection.dart';
 import 'package:flauncher/actions.dart';
 import 'package:flauncher/custom_traversal_policy.dart';
+import 'package:flauncher/providers/app_lock_service.dart';
 import 'package:flauncher/providers/apps_service.dart';
+import 'package:flauncher/providers/brightness_service.dart';
+import 'package:flauncher/widgets/settings/settings_panel.dart';
+import 'package:flutter/services.dart';
 import 'package:flauncher/providers/launcher_state.dart';
 import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
@@ -70,6 +74,19 @@ class _FLauncherState extends State<FLauncher> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _openSettingsIfAsked());
+  }
+
+  /// The quick panel (hold Home / YouTube button) can ask Arc to open its settings.
+  Future<void> _openSettingsIfAsked() async {
+    try {
+      final open = await const MethodChannel('me.efesser.flauncher/method').invokeMethod<bool>('consumeOpenSettings');
+      if (open == true && mounted) {
+        showDialog(context: context, builder: (_) => const SettingsPanel());
+      }
+    } catch (_) {
+      // older native side
+    }
   }
 
   @override
@@ -84,6 +101,9 @@ class _FLauncherState extends State<FLauncher> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       context.read<WatchNextService>().refreshPermissionAndItems();
+      context.read<AppLockService>().refresh();
+      context.read<BrightnessService>().applyCurrentSlotBrightness();
+      _openSettingsIfAsked();
     }
   }
 

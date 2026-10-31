@@ -33,6 +33,11 @@ class AppLockService extends ChangeNotifier {
   bool _hasPin = false;
   bool _isActive = false;
   int _relockMinutes = 0;
+  String _lockType = 'pin';
+
+  /// 'pin' (four digits) or 'pattern' (4-8 presses of the arrows and OK).
+  String get lockType => _lockType;
+  String get secretName => _lockType == 'pattern' ? 'pattern' : 'PIN';
 
   Set<String> get lockedPackages => _locked;
   bool get hasPin => _hasPin;
@@ -57,6 +62,7 @@ class AppLockService extends ChangeNotifier {
       _hasPin = await _channel.invokeMethod<bool>('appLockHasPin') ?? false;
       _isActive = await _channel.invokeMethod<bool>('appLockIsActive') ?? false;
       _relockMinutes = await _channel.invokeMethod<int>('appLockGetRelockMinutes') ?? 0;
+      _lockType = await _channel.invokeMethod<String>('appLockGetType') ?? 'pin';
     } catch (e) {
       debugPrint('App lock: $e');
     }
@@ -64,9 +70,11 @@ class AppLockService extends ChangeNotifier {
   }
 
   /// Opens the PIN screen. [set] chooses a new PIN (asking for the old one first, if any).
-  Future<bool> _askPin({bool set = false}) async {
+  Future<bool> _askPin({bool set = false, String? type}) async {
     try {
-      return await _channel.invokeMethod<bool>('appLockRequestPin', {'mode': set ? 'set' : 'verify'}) ?? false;
+      return await _channel.invokeMethod<bool>(
+              'appLockRequestPin', {'mode': set ? 'set' : 'verify', if (type != null) 'type': type}) ??
+          false;
     } catch (e) {
       debugPrint('App lock PIN: $e');
       return false;
@@ -85,17 +93,22 @@ class AppLockService extends ChangeNotifier {
     await refresh();
   }
 
+  /// Chooses a new secret of [type] (asks for the current one first).
+  Future<void> setLockType(String type) async {
+    await _askPin(set: true, type: type);
+    await refresh();
+  }
+
   Future<void> changePin() async {
     await _askPin(set: true);
     await refresh();
   }
 
-  /// Moves to the next unlock duration; needs the PIN.
-  Future<void> cycleRelock() async {
-    if (_hasPin && !await _askPin()) return;
-    final index = relockOptions.indexOf(relockOption);
-    final next = relockOptions[(index + 1) % relockOptions.length];
-    await _channel.invokeMethod('appLockSetRelockMinutes', {'minutes': next.minutes});
+  /// Asks for the PIN (true when there is none yet).
+  Future<bool> verifyPin() async => !_hasPin || await _askPin();
+
+  Future<void> setRelock(int minutes) async {
+    await _channel.invokeMethod('appLockSetRelockMinutes', {'minutes': minutes});
     await refresh();
   }
 }

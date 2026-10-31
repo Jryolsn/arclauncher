@@ -1,6 +1,7 @@
 name: Build APK
 
-# Jryolsn fork: builds a sideload APK on every push, for automatic install on our TV.
+# Jryolsn fork: builds a sideload APK on every push, for install on our TVs.
+# Every build is signed with the same sideload key, so updates install over each other.
 on:
   push:
     branches: ["**"]
@@ -8,6 +9,7 @@ on:
 
 env:
   FLUTTER_VERSION: "3.41.9"
+  VERSION_BASE: "1.3"
 
 jobs:
   build:
@@ -23,13 +25,27 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+      - name: Version
+        id: version
+        run: |
+          suffix=""
+          [ "$GITHUB_REF_NAME" = "main" ] || suffix="-dev"
+          echo "name=${VERSION_BASE}.${GITHUB_RUN_NUMBER}${suffix}" >> "$GITHUB_OUTPUT"
       - run: flutter pub get
       - name: Build release APK (no self-updater)
         env:
           SIDELOAD_SIGNING: "true"
-        run: flutter build apk --release --flavor github --build-name=${GITHUB_SHA::7}
+        # The run number only grows, so every build is a newer versionCode than the last.
+        run: >
+          flutter build apk --release --flavor github
+          --build-name=${{ steps.version.outputs.name }}
+          --build-number=${{ github.run_number }}
+      - name: Rename APK
+        run: |
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/*armeabi-v7a*.apk "dist/arc-launcher-${{ steps.version.outputs.name }}-armeabi-v7a.apk"
       - uses: actions/upload-artifact@v4
         with:
           name: arc-launcher
-          path: build/app/outputs/flutter-apk/*armeabi-v7a*.apk
+          path: dist/*.apk
           if-no-files-found: error

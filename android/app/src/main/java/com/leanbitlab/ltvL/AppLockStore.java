@@ -21,6 +21,13 @@ final class AppLockStore {
     private static final String KEY_PIN_HASH = "pin_hash";
     private static final String KEY_PIN_SALT = "pin_salt";
     private static final String KEY_RELOCK = "relock_minutes";
+    private static final String KEY_TYPE = "lock_type";
+    private static final String KEY_LENGTH = "secret_length";
+
+    /** The secret is four digits. */
+    static final String TYPE_PIN = "pin";
+    /** The secret is 4-8 remote presses: U, D, L, R and O (OK). */
+    static final String TYPE_PATTERN = "pattern";
     /** Locked from the start (can be unlocked): from these the lock could be switched off or Arc removed. */
     private static final String[] PROTECTED_PACKAGES = {"com.android.tv.settings", "com.android.vending"};
 
@@ -66,7 +73,20 @@ final class AppLockStore {
         unlocked.clear();
     }
 
+    static String lockType(Context context) {
+        return prefs(context).getString(KEY_TYPE, TYPE_PIN);
+    }
+
+    /** Length of the stored secret, so a remote pattern can be checked as soon as it is complete. */
+    static int secretLength(Context context) {
+        return prefs(context).getInt(KEY_LENGTH, 4);
+    }
+
     static void setPin(Context context, String pin) {
+        setSecret(context, TYPE_PIN, pin);
+    }
+
+    static void setSecret(Context context, String type, String pin) {
         boolean first = !hasPin(context);
         byte[] salt = new byte[16];
         new SecureRandom().nextBytes(salt);
@@ -74,6 +94,8 @@ final class AppLockStore {
         prefs(context).edit()
                 .putString(KEY_PIN_SALT, saltHex)
                 .putString(KEY_PIN_HASH, hash(saltHex, pin))
+                .putString(KEY_TYPE, type)
+                .putInt(KEY_LENGTH, pin.length())
                 .apply();
         if (first) {
             for (String pkg : PROTECTED_PACKAGES) setLocked(context, pkg, true);

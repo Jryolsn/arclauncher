@@ -373,14 +373,21 @@ class _LockedTabState extends State<_LockedTab> {
           child: FocusableSettingsTile(
             autofocus: true,
             leading: const Icon(Icons.pin_outlined),
-            title: Text(lock.hasPin ? 'Change PIN' : 'Set PIN', style: Theme.of(context).textTheme.bodyMedium),
+            title: Text(lock.hasPin ? 'Change ${lock.secretName}' : 'Set PIN',
+                style: Theme.of(context).textTheme.bodyMedium),
             onPressed: lock.changePin,
           ),
         ),
         FocusableSettingsTile(
+          leading: const Icon(Icons.gamepad_outlined),
+          title: Text('Lock type: ${lock.lockType == 'pattern' ? 'Remote pattern' : 'PIN'}',
+              style: Theme.of(context).textTheme.bodyMedium),
+          onPressed: () => _pickLockType(context, lock),
+        ),
+        FocusableSettingsTile(
           leading: const Icon(Icons.timer_outlined),
           title: Text('Stay unlocked: ${lock.relockOption.label}', style: Theme.of(context).textTheme.bodyMedium),
-          onPressed: lock.cycleRelock,
+          onPressed: () => _pickRelock(context, lock),
         ),
         const SettingsSectionDivider(),
         if (apps.isEmpty)
@@ -392,6 +399,51 @@ class _LockedTabState extends State<_LockedTab> {
       ],
     );
   }
+}
+
+/// PIN, or a pattern of arrow and OK presses that hides which keys were pressed.
+Future<void> _pickLockType(BuildContext context, AppLockService lock) async {
+  const types = {'pin': 'PIN (4 digits)', 'pattern': 'Remote pattern (arrows + OK)'};
+  final chosen = await showDialog<String>(
+    context: context,
+    builder: (dialogContext) => SimpleDialog(
+      title: const Text('Lock type'),
+      children: types.entries
+          .map((type) => FocusableSettingsTile(
+                autofocus: type.key == lock.lockType,
+                frameLeading: false,
+                leading: Icon(type.key == lock.lockType ? Icons.radio_button_checked : Icons.radio_button_unchecked),
+                title: Text(type.value, style: Theme.of(dialogContext).textTheme.bodyMedium),
+                onPressed: () => Navigator.of(dialogContext).pop(type.key),
+              ))
+          .toList(),
+    ),
+  );
+  // Choosing a type means choosing its secret now; the current one is asked for first.
+  if (chosen != null) await lock.setLockType(chosen);
+}
+
+/// PIN once, then a list of durations to pick from.
+Future<void> _pickRelock(BuildContext context, AppLockService lock) async {
+  if (!await lock.verifyPin() || !context.mounted) return;
+  final chosen = await showDialog<int>(
+    context: context,
+    builder: (dialogContext) => SimpleDialog(
+      title: const Text('Stay unlocked'),
+      children: relockOptions
+          .map((option) => FocusableSettingsTile(
+                autofocus: option.minutes == lock.relockMinutes,
+                frameLeading: false,
+                leading: Icon(
+                  option.minutes == lock.relockMinutes ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                ),
+                title: Text(option.label, style: Theme.of(dialogContext).textTheme.bodyMedium),
+                onPressed: () => Navigator.of(dialogContext).pop(option.minutes),
+              ))
+          .toList(),
+    ),
+  );
+  if (chosen != null) await lock.setRelock(chosen);
 }
 
 /// Up from the first row goes back to the tabs, like the other lists.
@@ -469,7 +521,9 @@ class _AppListItem extends StatefulWidget
   final bool autofocus;
   final bool isFirst;
 
-  const _AppListItem(this.application, {this.autofocus = false, this.isFirst = false});
+  // Keyed by package, so when an app leaves a list the remaining rows keep their own icon.
+  _AppListItem(this.application, {this.autofocus = false, this.isFirst = false})
+      : super(key: ValueKey(application.packageName));
 
   @override
   State<StatefulWidget> createState() => _AppListItemState();

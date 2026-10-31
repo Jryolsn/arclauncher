@@ -80,6 +80,8 @@ public class MainActivity extends FlutterActivity {
     private static final int REQUEST_CODE_READ_TV_LISTINGS = 1001;
     private static final String COLUMN_ASPECT_RATIO = "aspect_ratio";
     private static final int REQUEST_PIN = 2001;
+    /** Set by the quick panel's "All launcher settings": Arc opens its settings when it shows. */
+    static volatile boolean openSettingsOnResume;
     private MethodChannel.Result pendingPinResult;
 
     @Override
@@ -161,7 +163,12 @@ public class MainActivity extends FlutterActivity {
                     AppLockStore.setLocked(this, call.argument("packageName"), Boolean.TRUE.equals(call.argument("locked")));
                     result.success(true);
                 }
+                case "consumeOpenSettings" -> {
+                    result.success(openSettingsOnResume);
+                    openSettingsOnResume = false;
+                }
                 case "appLockHasPin" -> result.success(AppLockStore.hasPin(this));
+                case "appLockGetType" -> result.success(AppLockStore.lockType(this));
                 case "appLockIsActive" -> result.success(ArcAccessibilityService.isRunning());
                 case "appLockGetRelockMinutes" -> result.success(AppLockStore.relockMinutes(this));
                 case "appLockSetRelockMinutes" -> {
@@ -172,7 +179,11 @@ public class MainActivity extends FlutterActivity {
                     if (pendingPinResult != null) pendingPinResult.success(false);
                     pendingPinResult = result;
                     int mode = "set".equals(call.argument("mode")) ? PinActivity.MODE_SET : PinActivity.MODE_VERIFY;
-                    startActivityForResult(new Intent(this, PinActivity.class).putExtra(PinActivity.EXTRA_MODE, mode), REQUEST_PIN);
+                    String type = call.argument("type");
+                    if (type == null) type = AppLockStore.lockType(this);
+                    startActivityForResult(new Intent(this, PinActivity.class)
+                            .putExtra(PinActivity.EXTRA_MODE, mode)
+                            .putExtra(PinActivity.EXTRA_TYPE, type), REQUEST_PIN);
                 }
                 case "setDimLevel" -> result.success(DimOverlayService.apply(this, call.<Integer>argument("darkness")));
                 case "canDrawOverlays" -> result.success(Settings.canDrawOverlays(this));
