@@ -49,6 +49,12 @@ class FLauncherChannel {
 
   Future<void> launchApp(String packageName) async => await _methodChannel.invokeMethod('launchApp', packageName);
 
+  Future<bool> isAccessibilityRunning() async =>
+      await _methodChannel.invokeMethod<bool>('appLockIsActive') ?? false;
+
+  Future<bool> openAccessibilitySettings() async =>
+      await _methodChannel.invokeMethod<bool>('openAccessibilitySettings') ?? false;
+
   Future<void> openSettings() async => await _methodChannel.invokeMethod('openSettings');
 
   Future<void> openAppInfo(String packageName) async => await _methodChannel.invokeMethod('openAppInfo', packageName);

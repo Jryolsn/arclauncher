@@ -24,6 +24,7 @@ import 'focusable_settings_tile.dart';
 import 'brightness_settings_page.dart';
 import 'date_time_format_page.dart';
 import 'back_button_action_page.dart';
+import 'quick_panel_settings_page.dart';
 import 'wifi_usage_period_page.dart';
 import 'screensaver_clock_style_page.dart';
 
@@ -68,6 +69,12 @@ class GeneralSettingsPage extends StatelessWidget {
                   leading: const Icon(Icons.date_range),
                   title: Text(localizations.dateAndTimeFormat, style: Theme.of(context).textTheme.bodyMedium),
                   onPressed: () => Navigator.of(context).pushNamed(DateTimeFormatPage.routeName),
+                ),
+                FocusableSettingsTile(
+                  showChevron: true,
+                  leading: const Icon(Icons.web_asset),
+                  title: Text('Quick panel', style: Theme.of(context).textTheme.bodyMedium),
+                  onPressed: () => Navigator.of(context).pushNamed(QuickPanelSettingsPage.routeName),
                 ),
                 FocusableSettingsTile(
                   showChevron: true,

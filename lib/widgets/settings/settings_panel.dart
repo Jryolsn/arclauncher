@@ -29,6 +29,7 @@ import 'package:flauncher/widgets/settings/status_bar_panel_page.dart';
 import 'package:flauncher/widgets/settings/wallpaper_panel_page.dart';
 import 'package:flauncher/widgets/settings/wifi_usage_period_page.dart';
 import 'package:flauncher/widgets/settings/back_button_action_page.dart';
+import 'package:flauncher/widgets/settings/quick_panel_settings_page.dart';
 import 'package:flauncher/widgets/settings/date_time_format_page.dart';
 import 'package:flauncher/widgets/settings/app_details_page.dart';
 import 'package:flauncher/widgets/settings/accent_color_page.dart';
@@ -119,6 +120,8 @@ class _SettingsPanelState extends State<SettingsPanel> {
                       );
                     case WifiUsagePeriodPage.routeName:
                       return _FastPageRoute(builder: (_) => WifiUsagePeriodPage());
+                    case QuickPanelSettingsPage.routeName:
+                      return _FastPageRoute(builder: (_) => const QuickPanelSettingsPage());
                     case BackButtonActionPage.routeName:
                       return _FastPageRoute(builder: (_) => BackButtonActionPage());
                     case DateTimeFormatPage.routeName:

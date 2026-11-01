@@ -17,6 +17,7 @@
  */
 
 
+import 'package:flauncher/flauncher_channel.dart';
 import 'package:flauncher/providers/app_lock_service.dart';
 import 'package:flauncher/providers/apps_service.dart';
 
@@ -362,12 +363,11 @@ class _LockedTabState extends State<_LockedTab> {
     return ListView(
       children: [
         if (!lock.isActive)
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 4, 16, 8),
-            child: Text(
-              "App lock is off: turn on \"Arc Brightness\" in Android Settings > Accessibility.",
-              style: TextStyle(color: Colors.orangeAccent),
-            ),
+          FocusableSettingsTile(
+            leading: const Icon(Icons.warning_amber_rounded, color: Colors.orangeAccent),
+            title: Text('App lock is off: enable "Arc Brightness" in Accessibility',
+                style: Theme.of(context).textTheme.bodyMedium),
+            onPressed: () => FLauncherChannel().openAccessibilitySettings(),
           ),
         _FirstRow(
           child: FocusableSettingsTile(

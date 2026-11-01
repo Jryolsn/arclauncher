@@ -191,6 +191,8 @@ public class MainActivity extends FlutterActivity {
                     Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()));
                     result.success(tryStartActivity(intent));
                 }
+                case "openAccessibilitySettings" ->
+                    result.success(tryStartActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
                 case "openWifiSettings" -> result.success(openWifiSettings());
                 case "getMediaStoreImages" -> result.success(getMediaStoreImages());
                 case "getMediaStoreVideos" -> result.success(getMediaStoreVideos());
