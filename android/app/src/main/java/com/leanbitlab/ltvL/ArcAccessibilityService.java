@@ -53,6 +53,7 @@ public class ArcAccessibilityService extends AccessibilityService {
     private static final String PIN_SCREENS = "com.omeda.arc.Pin";
     private static final String QUICK_PANEL = "com.omeda.arc.QuickPanel";
     private static final String VPN_GATE = "com.omeda.arc.VpnGate";
+    private static final String HOME_SCREEN = "com.omeda.arc.MainActivity";
     private static final long RECHECK_MS = 30_000;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -64,7 +65,9 @@ public class ArcAccessibilityService extends AccessibilityService {
     private View vpnToast;
     private final Runnable hideToast = this::hideVpnToast;
     private final VpnGuard.Listener vpnListener = up -> {
-        if (!up && foreground != null) checkVpn(foreground, true);
+        if (up) return;
+        if (foreground != null) checkVpn(foreground, true);
+        stopGuardedInBackground();
     };
     private final BroadcastReceiver screenOff = new BroadcastReceiver() {
         @Override
@@ -151,6 +154,8 @@ public class ArcAccessibilityService extends AccessibilityService {
                 || cls.contains("InputMethod") || pkg.contains("inputmethod") || pkg.contains(".ime")) {
             return;
         }
+        // Arc's own overlays (VPN note, dim layer, Flutter views) aren't an app change; only its home screen is.
+        if (pkg.equals(getPackageName()) && !cls.startsWith(HOME_SCREEN)) return;
         boolean entered = !pkg.equals(foreground);
         if (entered) {
             foreground = pkg;
@@ -187,6 +192,18 @@ public class ArcAccessibilityService extends AccessibilityService {
             }, 1_000);
         }
         return true;
+    }
+
+    /**
+     * The VPN dropped: in block mode, end every app that needs VPN and sits in the background, so a paused
+     * player can't carry on over the open connection. Android won't end one that runs a foreground service.
+     */
+    private void stopGuardedInBackground() {
+        if (!VpnGuard.MODE_BLOCK.equals(VpnGuard.mode(this))) return;
+        ActivityManager am = getSystemService(ActivityManager.class);
+        for (String pkg : VpnGuard.guardedPackages(this)) {
+            if (!pkg.equals(foreground)) am.killBackgroundProcesses(pkg);
+        }
     }
 
     /** A small note in the corner for a few seconds when an app that needs VPN opens: where the tunnel comes out. */
