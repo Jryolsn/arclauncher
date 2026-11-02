@@ -71,7 +71,7 @@ public class VpnGateActivity extends Activity implements VpnGuard.Listener {
     protected void onResume() {
         super.onResume();
         VpnGuard.addListener(this);
-        if (VpnGuard.isUp(this)) proceed();
+        if (VpnGuard.isProtected(this, packageName)) proceed();
     }
 
     @Override
@@ -82,7 +82,7 @@ public class VpnGateActivity extends Activity implements VpnGuard.Listener {
 
     @Override
     public void onVpnChanged(boolean up) {
-        if (up) proceed();
+        if (up && VpnGuard.isProtected(this, packageName)) proceed();
     }
 
     private void show(Intent intent) {
@@ -98,12 +98,19 @@ public class VpnGateActivity extends Activity implements VpnGuard.Listener {
             icon.setImageDrawable(null);
         }
 
-        titleView.setText(dropped ? "VPN disconnected" : "VPN is off");
         String vpnApp = VpnGuard.vpnApp(this);
         String vpnName = vpnApp != null ? VpnGuard.label(this, vpnApp) : "your VPN";
-        textView.setText(dropped
-                ? app + " was stopped so that it can't connect without VPN.\nConnect " + vpnName + " to continue."
-                : app + " only runs with VPN. Connect " + vpnName + " first.");
+        if (VpnGuard.isUp(this)) {
+            // The VPN is up, but this app isn't one of the apps it tunnels.
+            titleView.setText(app + " is not on the VPN");
+            textView.setText("The VPN is on, but " + app + " isn't in " + vpnName
+                    + "'s list of apps.\nAdd it there to continue.");
+        } else {
+            titleView.setText(dropped ? "VPN disconnected" : "VPN is off");
+            textView.setText(dropped
+                    ? app + " was stopped so that it can't connect without VPN.\nConnect " + vpnName + " to continue."
+                    : app + " only runs with VPN. Connect " + vpnName + " first.");
+        }
 
         buttons.removeAllViews();
         Button first = null;

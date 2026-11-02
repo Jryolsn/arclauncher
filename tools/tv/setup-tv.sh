@@ -93,7 +93,9 @@ step_arc() {
     adb -s "$TV" install -r "$apk"
     tv appops set "$ARC" SYSTEM_ALERT_WINDOW allow
     enable_accessibility "$ARC_A11Y"
-    echo "  Arc installed. Overlay allowed, accessibility service on (dim screen, quick panel, app lock)."
+    # Lets the VPN guard see which apps the VPN covers.
+    tv pm grant "$ARC" android.permission.DUMP || true
+    echo "  Arc installed. Overlay allowed, accessibility service on (dim screen, quick panel, app lock, VPN guard)."
     echo "  For updates: add https://github.com/$ARC_REPO to Obtainium (test TV: include pre-releases)."
 }
 

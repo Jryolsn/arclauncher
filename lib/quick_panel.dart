@@ -222,12 +222,24 @@ class _CurrentAppCard extends StatelessWidget {
         final textTheme = Theme.of(context).textTheme;
 
         final place = [vpn.flag, vpn.city ?? vpn.country].whereType<String>().join(' ');
-        final vpnLine = vpn.up
-            ? ['VPN on', if (place.isNotEmpty) place, if (vpn.ip != null) vpn.ip!].join(' · ')
-            : 'VPN off';
-        final Color color = !vpn.up
-            ? (guarded ? Colors.orangeAccent : Colors.white60)
-            : Colors.lightGreenAccent;
+        // covered: true/false when Arc can see the VPN's app list, null when it can't.
+        final covered = app['covered'] as bool?;
+        final onVpn = vpn.up && covered != false;
+        final String vpnLine;
+        if (!vpn.up) {
+          vpnLine = 'No VPN · direct connection';
+        } else if (covered == false) {
+          vpnLine = 'Not on VPN · direct connection';
+        } else {
+          vpnLine = [
+            covered == null ? 'VPN on (this app not checked)' : 'Through VPN',
+            if (place.isNotEmpty) place,
+            if (vpn.ip != null) vpn.ip!,
+          ].join(' · ');
+        }
+        final Color color = onVpn
+            ? (covered == null ? Colors.white70 : Colors.lightGreenAccent)
+            : (guarded ? Colors.orangeAccent : Colors.white60);
 
         return Padding(
           padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
@@ -250,11 +262,11 @@ class _CurrentAppCard extends StatelessWidget {
                 ]),
               const SizedBox(height: 8),
               Row(children: [
-                Icon(vpn.up ? Icons.lock : Icons.lock_open, size: 18, color: color),
+                Icon(onVpn ? Icons.lock : Icons.lock_open, size: 18, color: color),
                 const SizedBox(width: 8),
                 Expanded(child: Text(vpnLine, style: textTheme.bodyMedium?.copyWith(color: color))),
               ]),
-              if (vpn.up && vpn.vpnApp != null)
+              if (onVpn && vpn.vpnApp != null)
                 Padding(
                   padding: const EdgeInsets.only(left: 26, top: 2),
                   child: Text([vpn.vpnApp!, if (vpn.org != null) vpn.org!].join(' · '),

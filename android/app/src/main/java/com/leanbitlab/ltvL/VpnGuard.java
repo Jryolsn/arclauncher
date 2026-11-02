@@ -163,6 +163,7 @@ final class VpnGuard {
         map.put("name", label(context, packageName));
         map.put("icon", iconPng(context, packageName));
         map.put("guarded", isGuarded(context, packageName));
+        map.put("covered", covers(context, packageName));
         return map;
     }
 
@@ -187,7 +188,80 @@ final class VpnGuard {
 
     /** True if the guard would stop this app now. */
     static boolean blocks(Context context, String packageName) {
-        return isGuarded(context, packageName) && !isUp(context) && !isAllowedAnyway(packageName);
+        return isGuarded(context, packageName) && !isAllowedAnyway(packageName) && !isProtected(context, packageName);
+    }
+
+    /** A VPN is up and, when Arc can check it, this app's traffic goes through it. */
+    static boolean isProtected(Context context, String packageName) {
+        return isUp(context) && !Boolean.FALSE.equals(covers(context, packageName));
+    }
+
+    // ---- Which apps the VPN covers ----
+    // Android tells an ordinary app only whether a VPN applies to the app itself. With the DUMP permission
+    // (granted once over adb: pm grant <arc> android.permission.DUMP) Arc reads the VPN's UID ranges from
+    // the connectivity service instead, and knows for every app.
+
+    private static final long UIDS_MAX_AGE_MS = 3_000;
+    private static volatile List<int[]> vpnUidRanges;
+    private static volatile long vpnUidsAt;
+
+    static boolean canCheckApps(Context context) {
+        return context.checkSelfPermission("android.permission.DUMP") == PackageManager.PERMISSION_GRANTED;
+    }
+
+    /** True/false when known, null when Arc can't tell (no DUMP permission) or no VPN is up. */
+    static Boolean covers(Context context, String packageName) {
+        if (packageName == null || !canCheckApps(context) || !isUp(context)) return null;
+        List<int[]> ranges = vpnUidRanges(context);
+        if (ranges == null) return null;
+        int uid;
+        try {
+            uid = context.getPackageManager().getApplicationInfo(packageName, 0).uid;
+        } catch (PackageManager.NameNotFoundException e) {
+            return null;
+        }
+        for (int[] r : ranges) {
+            if (uid >= r[0] && uid <= r[1]) return true;
+        }
+        return false;
+    }
+
+    /** UID ranges of all VPN networks, from "dumpsys connectivity". Null if it couldn't be read. */
+    private static synchronized List<int[]> vpnUidRanges(Context context) {
+        long now = SystemClock.elapsedRealtime();
+        if (vpnUidRanges != null && now - vpnUidsAt < UIDS_MAX_AGE_MS) return vpnUidRanges;
+        java.io.File file = new java.io.File(context.getCacheDir(), "connectivity.txt");
+        try {
+            try (java.io.FileOutputStream out = new java.io.FileOutputStream(file)) {
+                if (!android.os.Debug.dumpService("connectivity", out.getFD(), new String[0])) return null;
+            }
+            List<int[]> ranges = new ArrayList<>();
+            boolean sawVpn = false;
+            java.util.regex.Pattern range = java.util.regex.Pattern.compile("\\{(\\d+)-(\\d+)\\}");
+            try (BufferedReader r = new BufferedReader(new java.io.FileReader(file))) {
+                String line;
+                while ((line = r.readLine()) != null) {
+                    if (!line.contains("NetworkAgentInfo") || !line.contains("Transports: VPN")) continue;
+                    int at = line.indexOf("Uids: <");
+                    if (at < 0) continue;
+                    sawVpn = true;
+                    int end = line.indexOf('>', at);
+                    java.util.regex.Matcher m = range.matcher(line.substring(at, end < 0 ? line.length() : end));
+                    while (m.find()) {
+                        ranges.add(new int[]{Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2))});
+                    }
+                }
+            }
+            vpnUidRanges = sawVpn ? ranges : null;
+            vpnUidsAt = now;
+            return vpnUidRanges;
+        } catch (Exception e) {
+            android.util.Log.w("ArcVpn", "Reading VPN apps failed: " + e);
+            return null;
+        } finally {
+            //noinspection ResultOfMethodCallIgnored
+            file.delete();
+        }
     }
 
     // ---- VPN state ----
@@ -261,6 +335,7 @@ final class VpnGuard {
         String vpnApp = vpnApp(context);
         map.put("vpnAppPackage", vpnApp);
         map.put("vpnApp", label(context, vpnApp));
+        map.put("canCheckApps", canCheckApps(context));
         if (up && SystemClock.elapsedRealtime() - infoAt > INFO_MAX_AGE_MS) fetchInfo(false);
         return map;
     }

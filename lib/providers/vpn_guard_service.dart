@@ -23,6 +23,9 @@ class VpnStatus {
   final String? vpnApp;
   final String? vpnAppPackage;
 
+  /// Arc may read which apps the VPN covers (DUMP permission, granted over adb).
+  final bool canCheckApps;
+
   const VpnStatus({
     this.up = false,
     this.ip,
@@ -32,6 +35,7 @@ class VpnStatus {
     this.org,
     this.vpnApp,
     this.vpnAppPackage,
+    this.canCheckApps = false,
   });
 
   factory VpnStatus.fromMap(Map<dynamic, dynamic> map) {
@@ -49,6 +53,7 @@ class VpnStatus {
       org: s('org'),
       vpnApp: s('vpnApp'),
       vpnAppPackage: s('vpnAppPackage'),
+      canCheckApps: map['canCheckApps'] == true,
     );
   }
 

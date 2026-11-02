@@ -106,6 +106,16 @@ class _VpnGuardPageState extends State<VpnGuardPage> {
                   style: TextStyle(color: Colors.white60),
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                child: Text(
+                  status.canCheckApps
+                      ? 'Per-app check: on. Arc sees which apps the VPN covers.'
+                      : 'Per-app check: off. To let Arc see which apps the VPN covers, run once from a computer:\n'
+                          'adb shell pm grant com.jryolsn.arc android.permission.DUMP',
+                  style: TextStyle(color: status.canCheckApps ? Colors.white60 : Colors.white70),
+                ),
+              ),
               const SettingsSectionDivider(),
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 0, 16, 4),
