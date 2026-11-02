@@ -45,9 +45,15 @@
     <!-- Screen dimming: dark layer over all apps -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- VPN guard: ends an app that needs VPN once it is behind the VPN screen. -->
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <queries>
+        <!-- VPN apps, for the VPN guard's "Open <VPN app>" button. -->
+        <intent>
+            <action android:name="android.net.VpnService" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.MAIN" />
         </intent>
@@ -135,6 +141,17 @@
             android:excludeFromRecents="true"
             android:launchMode="singleTask"
             android:taskAffinity="${applicationId}.lock"
+            android:noHistory="true"
+            android:screenOrientation="landscape"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen" />
+
+        <!-- VPN guard screen, in its own task like the PIN gate. -->
+        <activity
+            android:name=".VpnGateActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:taskAffinity="${applicationId}.vpn"
             android:noHistory="true"
             android:screenOrientation="landscape"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen" />

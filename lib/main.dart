@@ -17,6 +17,7 @@
  */
 
 import 'package:flauncher/providers/app_lock_service.dart';
+import 'package:flauncher/providers/vpn_guard_service.dart';
 import 'dart:async';
 
 import 'package:flauncher/database.dart';
@@ -60,6 +61,7 @@ Future<void> main() async {
             }
         ),
         ChangeNotifierProvider(create: (_) => AppLockService()),
+        ChangeNotifierProvider(create: (_) => VpnGuardService(), lazy: false),
         ChangeNotifierProvider(
             create: (_) => BrightnessService(sharedPreferences),
             lazy: false

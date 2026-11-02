@@ -1,6 +1,9 @@
 package com.omeda.arc;
 
 import android.accessibilityservice.AccessibilityService;
+import android.app.ActivityManager;
+import android.graphics.drawable.GradientDrawable;
+import android.widget.TextView;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -26,6 +29,8 @@ import android.view.accessibility.AccessibilityEvent;
  *    own Settings screens (ordinary app overlays are hidden there) and which may be fully opaque.
  * 3. The app lock: whenever a locked app comes to the front, however it was opened (Arc, voice search,
  *    recents, a link, casting from a phone), its sound is paused and the PIN screen covers it.
+ * 4. The VPN guard: an app that needs VPN is covered by VpnGateActivity while no VPN is up, and is
+ *    paused and covered at once if the VPN drops while it is open.
  * 2. Opening the quick panel (QuickPanelActivity) by holding Home or with a spare remote button (the YouTube
  *    button by default), so brightness and the lock can be changed without leaving the app that is open.
  *
@@ -47,12 +52,20 @@ public class ArcAccessibilityService extends AccessibilityService {
     /** Our own windows and system overlays that come and go on top of apps without "leaving" them. */
     private static final String PIN_SCREENS = "com.omeda.arc.Pin";
     private static final String QUICK_PANEL = "com.omeda.arc.QuickPanel";
+    private static final String VPN_GATE = "com.omeda.arc.VpnGate";
     private static final long RECHECK_MS = 30_000;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private String foreground;
     private String gatedPackage;
     private long gatedAt;
+    private String vpnGatedPackage;
+    private long vpnGatedAt;
+    private View vpnToast;
+    private final Runnable hideToast = this::hideVpnToast;
+    private final VpnGuard.Listener vpnListener = up -> {
+        if (!up && foreground != null) checkVpn(foreground, true);
+    };
     private final BroadcastReceiver screenOff = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -63,7 +76,7 @@ public class ArcAccessibilityService extends AccessibilityService {
     private final Runnable recheck = new Runnable() {
         @Override
         public void run() {
-            if (foreground != null) checkLock(foreground);
+            if (foreground != null && !checkVpn(foreground, false)) checkLock(foreground);
             handler.postDelayed(this, RECHECK_MS);
         }
     };
@@ -98,6 +111,8 @@ public class ArcAccessibilityService extends AccessibilityService {
             registerReceiver(screenOff, new IntentFilter(Intent.ACTION_SCREEN_OFF));
         }
         handler.postDelayed(recheck, RECHECK_MS);
+        VpnGuard.start(this);
+        VpnGuard.addListener(vpnListener);
         // Get the quick panel's engine going once things have settled, so holding Home opens it at once.
         handler.postDelayed(() -> QuickPanelActivity.warmUp(this), 15_000);
     }
@@ -105,6 +120,8 @@ public class ArcAccessibilityService extends AccessibilityService {
     @Override
     public boolean onUnbind(Intent intent) {
         handler.removeCallbacks(recheck);
+        VpnGuard.removeListener(vpnListener);
+        hideVpnToast();
         try {
             unregisterReceiver(screenOff);
         } catch (IllegalArgumentException ignored) {
@@ -124,15 +141,94 @@ public class ArcAccessibilityService extends AccessibilityService {
         String pkg = pkgName.toString();
         String cls = event.getClassName() == null ? "" : event.getClassName().toString();
         // The PIN screen itself, the status bar, keyboards and dialogs from "android" don't change the app.
-        if (cls.startsWith(PIN_SCREENS) || cls.startsWith(QUICK_PANEL) || pkg.equals("com.android.systemui") || pkg.equals("android")
+        if (cls.startsWith(PIN_SCREENS) || cls.startsWith(QUICK_PANEL) || cls.startsWith(VPN_GATE) || pkg.equals("com.android.systemui") || pkg.equals("android")
                 || cls.contains("InputMethod") || pkg.contains("inputmethod") || pkg.contains(".ime")) {
             return;
         }
-        if (!pkg.equals(foreground)) {
+        boolean entered = !pkg.equals(foreground);
+        if (entered) {
             foreground = pkg;
             AppLockStore.onAppLeft(this, pkg);
+            VpnGuard.onAppLeft(pkg);
+            hideVpnToast();
         }
+        if (checkVpn(pkg, false)) return; // the PIN is asked for once the VPN is up
+        if (entered && VpnGuard.isGuarded(this, pkg)) showVpnToast();
         checkLock(pkg);
+    }
+
+    /**
+     * Covers an app that needs VPN while none is up. Returns true when it did. [dropped]: the VPN just went
+     * down under the open app, so it is paused at once and, in block mode, its process is ended once it is
+     * in the background.
+     */
+    private boolean checkVpn(String pkg, boolean dropped) {
+        if (!VpnGuard.blocks(this, pkg)) return false;
+        long now = SystemClock.elapsedRealtime();
+        if (pkg.equals(vpnGatedPackage) && now - vpnGatedAt < 1_500) return true;
+        vpnGatedPackage = pkg;
+        vpnGatedAt = now;
+        pauseMedia();
+        hideVpnToast();
+        startActivity(new Intent(this, VpnGateActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                .putExtra(VpnGateActivity.EXTRA_PACKAGE, pkg)
+                .putExtra(VpnGateActivity.EXTRA_DROPPED, dropped));
+        if (VpnGuard.MODE_BLOCK.equals(VpnGuard.mode(this))) {
+            handler.postDelayed(() -> {
+                ActivityManager am = getSystemService(ActivityManager.class);
+                am.killBackgroundProcesses(pkg);
+            }, 1_000);
+        }
+        return true;
+    }
+
+    /** A small note in the corner for a few seconds when an app that needs VPN opens: where the tunnel comes out. */
+    private void showVpnToast() {
+        java.util.Map<String, Object> status = VpnGuard.status(this);
+        StringBuilder text = new StringBuilder("\uD83D\uDD12 VPN");
+        Object vpnApp = status.get("vpnApp");
+        if (vpnApp != null) text.append(" \u00B7 ").append(vpnApp);
+        Object country = status.get("country");
+        if (country != null && !country.toString().isEmpty()) text.append(" \u00B7 ").append(country);
+        Object ip = status.get("ip");
+        if (ip != null && !ip.toString().isEmpty()) text.append(" \u00B7 ").append(ip);
+
+        hideVpnToast();
+        TextView view = new TextView(this);
+        view.setText(text);
+        view.setTextSize(14);
+        view.setTextColor(Color.WHITE);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.argb(200, 20, 24, 30));
+        bg.setCornerRadius(24);
+        view.setBackground(bg);
+        int pad = Math.round(10 * getResources().getDisplayMetrics().density);
+        view.setPadding(pad * 2, pad, pad * 2, pad);
+        WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                PixelFormat.TRANSLUCENT);
+        params.gravity = Gravity.TOP | Gravity.END;
+        params.x = pad * 3;
+        params.y = pad * 3;
+        vpnToast = view;
+        getSystemService(WindowManager.class).addView(view, params);
+        handler.removeCallbacks(hideToast);
+        handler.postDelayed(hideToast, 4_000);
+    }
+
+    private void hideVpnToast() {
+        if (vpnToast != null) {
+            try {
+                getSystemService(WindowManager.class).removeView(vpnToast);
+            } catch (IllegalArgumentException ignored) {
+                // already gone
+            }
+            vpnToast = null;
+        }
     }
 
     private void checkLock(String pkg) {

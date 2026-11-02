@@ -9,6 +9,9 @@ import 'app_bar_focus_ring.dart';
 import 'daily_wifi_usage_widget.dart';
 import 'date_time_widget.dart';
 import 'network_widget.dart';
+import 'vpn_indicator.dart';
+import 'settings/vpn_guard_page.dart';
+import '../providers/vpn_guard_service.dart';
 
 class FocusAwareAppBar extends StatefulWidget implements PreferredSizeWidget
 {
@@ -122,6 +125,23 @@ class FocusAwareAppBarState extends State<FocusAwareAppBar>
                         onPressed: () => context.read<NetworkService>().openWifiSettings(),
                         semanticLabel: 'Network',
                         child: const NetworkWidget(),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+              ),
+              // VPN: provider, place and address (only while a VPN is up or an app needs one)
+              Selector<VpnGuardService, bool>(
+                selector: (_, vpn) => vpn.status.up || vpn.guardedPackages.isNotEmpty,
+                builder: (context, show, _) => show
+                  ? Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: AppBarFocusRing(
+                        onPressed: () => showDialog(
+                          context: context,
+                          builder: (_) => const SettingsPanel(initialRoute: VpnGuardPage.routeName),
+                        ),
+                        semanticLabel: 'VPN',
+                        child: const VpnIndicator(),
                       ),
                     )
                   : const SizedBox.shrink(),

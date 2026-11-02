@@ -76,6 +76,7 @@ public class MainActivity extends FlutterActivity {
     private final String METHOD_CHANNEL = "me.efesser.flauncher/method";
     private final String APPS_EVENT_CHANNEL = "me.efesser.flauncher/event_apps";
     private final String NETWORK_EVENT_CHANNEL = "me.efesser.flauncher/event_network";
+    private final String VPN_EVENT_CHANNEL = "me.efesser.flauncher/event_vpn";
     private static final String PERMISSION_READ_TV_LISTINGS = "android.permission.READ_TV_LISTINGS";
     private static final int REQUEST_CODE_READ_TV_LISTINGS = 1001;
     private static final String COLUMN_ASPECT_RATIO = "aspect_ratio";
@@ -185,6 +186,32 @@ public class MainActivity extends FlutterActivity {
                             .putExtra(PinActivity.EXTRA_MODE, mode)
                             .putExtra(PinActivity.EXTRA_TYPE, type), REQUEST_PIN);
                 }
+                case "vpnGetGuarded" -> result.success(new ArrayList<>(VpnGuard.guardedPackages(this)));
+                case "vpnSetGuarded" -> {
+                    VpnGuard.setGuarded(this, call.argument("packageName"), Boolean.TRUE.equals(call.argument("guarded")));
+                    result.success(null);
+                }
+                case "vpnGetMode" -> result.success(VpnGuard.mode(this));
+                case "vpnSetMode" -> {
+                    VpnGuard.setMode(this, call.argument("mode"));
+                    result.success(null);
+                }
+                case "vpnGetStatus" -> result.success(VpnGuard.status(this));
+                case "vpnGetVpnApps" -> {
+                    List<Map<String, String>> apps = new ArrayList<>();
+                    for (String pkg : VpnGuard.installedVpnApps(this)) {
+                        Map<String, String> app = new HashMap<>();
+                        app.put("packageName", pkg);
+                        app.put("name", VpnGuard.label(this, pkg));
+                        apps.add(app);
+                    }
+                    result.success(apps);
+                }
+                case "vpnSetVpnApp" -> {
+                    VpnGuard.setVpnApp(this, call.argument("packageName"));
+                    result.success(null);
+                }
+                case "vpnOpenSystemSettings" -> result.success(tryStartActivity(new Intent(Settings.ACTION_VPN_SETTINGS)));
                 case "setDimLevel" -> result.success(DimOverlayService.apply(this, call.<Integer>argument("darkness")));
                 case "canDrawOverlays" -> result.success(Settings.canDrawOverlays(this));
                 case "requestOverlayPermission" -> {
@@ -246,6 +273,23 @@ public class MainActivity extends FlutterActivity {
 
         new EventChannel(messenger, NETWORK_EVENT_CHANNEL).setStreamHandler(
                 new NetworkEventStreamHandler(this));
+
+        new EventChannel(messenger, VPN_EVENT_CHANNEL).setStreamHandler(new EventChannel.StreamHandler() {
+            private VpnGuard.Listener listener;
+
+            @Override
+            public void onListen(Object arguments, EventChannel.EventSink events) {
+                listener = up -> events.success(VpnGuard.status(MainActivity.this));
+                VpnGuard.addListener(listener);
+                events.success(VpnGuard.status(MainActivity.this));
+            }
+
+            @Override
+            public void onCancel(Object arguments) {
+                VpnGuard.removeListener(listener);
+                listener = null;
+            }
+        });
     }
 
     private List<Map<String, Serializable>> getApplications() {
@@ -458,6 +502,12 @@ public class MainActivity extends FlutterActivity {
     }
 
     private boolean launchApp(String packageName) {
+        // An app that needs VPN never starts without it: the VPN screen starts it once the VPN is up.
+        if (VpnGuard.blocks(this, packageName)) {
+            return tryStartActivity(new Intent(this, VpnGateActivity.class)
+                    .putExtra(VpnGateActivity.EXTRA_PACKAGE, packageName)
+                    .putExtra(VpnGateActivity.EXTRA_LAUNCH, true));
+        }
         // A locked app asks for the PIN first, so it never flashes up before the lock screen.
         if (AppLockStore.isLocked(this, packageName) && !AppLockStore.isUnlocked(this, packageName)
                 && AppLockStore.hasPin(this)) {

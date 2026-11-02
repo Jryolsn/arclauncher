@@ -1,5 +1,6 @@
 
 import 'package:flauncher/providers/app_lock_service.dart';
+import 'package:flauncher/providers/vpn_guard_service.dart';
 import 'dart:typed_data';
 
 import 'package:flauncher/models/app.dart';
@@ -24,6 +25,7 @@ class AppDetailsPage extends StatelessWidget {
     AppLocalizations localizations = AppLocalizations.of(context)!;
     AppsService appsService = context.watch<AppsService>();
     AppLockService appLock = context.watch<AppLockService>();
+    VpnGuardService vpnGuard = context.watch<VpnGuardService>();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -96,6 +98,12 @@ class AppDetailsPage extends StatelessWidget {
                 icon: appLock.isLocked(application.packageName) ? Icons.lock_open : Icons.lock_outline,
                 title: appLock.isLocked(application.packageName) ? 'Unlock' : 'Lock',
                 onTap: () => appLock.toggleLock(application.packageName),
+              ),
+              _buildListTile(
+                context,
+                icon: vpnGuard.isGuarded(application.packageName) ? Icons.vpn_lock : Icons.vpn_key_outlined,
+                title: vpnGuard.isGuarded(application.packageName) ? "Don't require VPN" : 'Require VPN',
+                onTap: () => vpnGuard.toggleGuarded(application.packageName),
               ),
               if (!application.hidden)
                 _buildListTile(

@@ -17,6 +17,7 @@
  */
 
 import 'package:flauncher/widgets/side_panel_dialog.dart';
+import 'package:flauncher/widgets/settings/vpn_guard_page.dart';
 import 'package:flauncher/widgets/settings/applications_panel_page.dart';
 import 'package:flauncher/widgets/settings/launcher_sections_panel_page.dart';
 import 'package:flauncher/widgets/settings/gradient_panel_page.dart';
@@ -138,6 +139,8 @@ class _SettingsPanelState extends State<SettingsPanel> {
                       return _FastPageRoute(builder: (_) => const WatchNextMaxItemsPage());
                     case ScreensaverClockStylePage.routeName:
                       return _FastPageRoute(builder: (_) => const ScreensaverClockStylePage());
+                    case VpnGuardPage.routeName:
+                      return _FastPageRoute(builder: (_) => const VpnGuardPage());
                     case AccentColorPage.routeName:
                       return _FastPageRoute(builder: (_) => AccentColorPage());
                     case BrightnessSettingsPage.routeName:
