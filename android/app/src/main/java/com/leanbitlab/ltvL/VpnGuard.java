@@ -104,6 +104,10 @@ final class VpnGuard {
 
     /** The VPN app the user picked, or the only one installed, or null. */
     static String vpnApp(Context context) {
+        if (canCheckApps(context) && isUp(context)) {
+            vpnUidRanges(context);
+            if (vpnOwnerPackage != null) return vpnOwnerPackage;
+        }
         String chosen = prefs(context).getString(KEY_VPN_APP, null);
         if (chosen != null && isInstalled(context, chosen)) return chosen;
         List<String> apps = installedVpnApps(context);
@@ -204,6 +208,8 @@ final class VpnGuard {
     private static final long UIDS_MAX_AGE_MS = 3_000;
     private static volatile List<int[]> vpnUidRanges;
     private static volatile long vpnUidsAt;
+    /** The app that runs the VPN, when Arc can read it. */
+    private static volatile String vpnOwnerPackage;
 
     static boolean canCheckApps(Context context) {
         return context.checkSelfPermission("android.permission.DUMP") == PackageManager.PERMISSION_GRANTED;
@@ -237,11 +243,17 @@ final class VpnGuard {
             }
             List<int[]> ranges = new ArrayList<>();
             boolean sawVpn = false;
-            java.util.regex.Pattern range = java.util.regex.Pattern.compile("\\{(\\d+)-(\\d+)\\}");
+            // e.g. "Transports: WIFI|VPN ... Uids: <{10114-10114, 10116-10116}> ... OwnerUid: 10106"
+            java.util.regex.Pattern vpnTransport = java.util.regex.Pattern.compile("Transports: [A-Z|]*VPN");
+            java.util.regex.Pattern range = java.util.regex.Pattern.compile("(\\d+)-(\\d+)");
+            java.util.regex.Pattern owner = java.util.regex.Pattern.compile("OwnerUid: (\\d+)");
+            int ownerUid = -1;
             try (BufferedReader r = new BufferedReader(new java.io.FileReader(file))) {
                 String line;
                 while ((line = r.readLine()) != null) {
-                    if (!line.contains("NetworkAgentInfo") || !line.contains("Transports: VPN")) continue;
+                    if (!line.contains("NetworkAgentInfo") || !vpnTransport.matcher(line).find()) continue;
+                    java.util.regex.Matcher o = owner.matcher(line);
+                    if (o.find()) ownerUid = Integer.parseInt(o.group(1));
                     int at = line.indexOf("Uids: <");
                     if (at < 0) continue;
                     sawVpn = true;
@@ -253,6 +265,8 @@ final class VpnGuard {
                 }
             }
             vpnUidRanges = sawVpn ? ranges : null;
+            String[] owners = ownerUid > 0 ? context.getPackageManager().getPackagesForUid(ownerUid) : null;
+            vpnOwnerPackage = owners != null && owners.length > 0 ? owners[0] : null;
             vpnUidsAt = now;
             return vpnUidRanges;
         } catch (Exception e) {
