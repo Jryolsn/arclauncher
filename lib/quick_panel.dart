@@ -16,6 +16,7 @@ import 'package:flauncher/flauncher_app.dart';
 import 'package:flauncher/providers/app_lock_service.dart';
 import 'package:flauncher/providers/brightness_service.dart';
 import 'package:flauncher/providers/settings_service.dart';
+import 'package:flauncher/providers/vpn_guard_service.dart';
 import 'package:flauncher/widgets/rounded_switch_list_tile.dart';
 import 'package:flauncher/widgets/settings/applications_panel_page.dart';
 import 'package:flauncher/widgets/settings/brightness_settings_page.dart';
@@ -32,6 +33,17 @@ const _panelChannel = MethodChannel('arc/quick_panel');
 /// Goes up by one each time the panel is shown, so it starts fresh (focus on the first row, current values).
 final _shown = ValueNotifier<int>(0);
 
+/// The app the panel was opened over, and the VPN status (from the accessibility service).
+final _currentApp = ValueNotifier<Map<dynamic, dynamic>?>(null);
+
+Future<void> _loadCurrentApp() async {
+  try {
+    _currentApp.value = await _panelChannel.invokeMapMethod<dynamic, dynamic>('currentApp');
+  } catch (e) {
+    _currentApp.value = null;
+  }
+}
+
 @pragma('vm:entry-point')
 Future<void> quickPanelMain() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,6 +58,7 @@ Future<void> quickPanelMain() async {
       await prefs.reload();
       await brightness.applyCurrentSlotBrightness();
       await lock.refresh();
+      await _loadCurrentApp();
       _shown.value++;
     }
     return null;
@@ -138,6 +151,7 @@ class _QuickPanel extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          const _CurrentAppCard(),
                           RoundedSwitchListTile(
                             autofocus: true,
                             title: Text('Dim screen', style: textStyle),
@@ -186,6 +200,81 @@ class _QuickPanel extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Which app is open and whether its traffic is guarded by VPN, with a switch to require VPN for it.
+class _CurrentAppCard extends StatelessWidget {
+  const _CurrentAppCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<Map<dynamic, dynamic>?>(
+      valueListenable: _currentApp,
+      builder: (context, app, _) {
+        if (app == null) return const SizedBox.shrink();
+        final vpn = VpnStatus.fromMap((app['vpn'] as Map?) ?? const {});
+        final packageName = app['packageName'] as String?;
+        final name = app['name'] as String? ?? packageName;
+        final icon = app['icon'];
+        final guarded = app['guarded'] == true;
+        final textTheme = Theme.of(context).textTheme;
+
+        final place = [vpn.flag, vpn.city ?? vpn.country].whereType<String>().join(' ');
+        final vpnLine = vpn.up
+            ? ['VPN on', if (place.isNotEmpty) place, if (vpn.ip != null) vpn.ip!].join(' · ')
+            : 'VPN off';
+        final Color color = !vpn.up
+            ? (guarded ? Colors.orangeAccent : Colors.white60)
+            : Colors.lightGreenAccent;
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (packageName != null)
+                Row(children: [
+                  if (icon is Uint8List)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.memory(icon, width: 40, height: 40),
+                    )
+                  else
+                    const Icon(Icons.apps, size: 40),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(name ?? '', style: textTheme.titleMedium, overflow: TextOverflow.ellipsis),
+                  ),
+                ]),
+              const SizedBox(height: 8),
+              Row(children: [
+                Icon(vpn.up ? Icons.lock : Icons.lock_open, size: 18, color: color),
+                const SizedBox(width: 8),
+                Expanded(child: Text(vpnLine, style: textTheme.bodyMedium?.copyWith(color: color))),
+              ]),
+              if (vpn.up && vpn.vpnApp != null)
+                Padding(
+                  padding: const EdgeInsets.only(left: 26, top: 2),
+                  child: Text([vpn.vpnApp!, if (vpn.org != null) vpn.org!].join(' · '),
+                      style: textTheme.bodySmall?.copyWith(color: Colors.white60)),
+                ),
+              if (packageName != null)
+                RoundedSwitchListTile(
+                  title: Text('Require VPN for this app', style: textTheme.bodyMedium),
+                  secondary: Icon(guarded ? Icons.vpn_lock : Icons.vpn_key_outlined),
+                  value: guarded,
+                  onChanged: (value) async {
+                    await _panelChannel.invokeMethod('setVpnGuarded', {'packageName': packageName, 'guarded': value});
+                    await _loadCurrentApp();
+                  },
+                ),
+              const SettingsSectionDivider(),
+            ],
+          ),
+        );
+      },
     );
   }
 }

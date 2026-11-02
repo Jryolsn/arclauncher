@@ -4,6 +4,8 @@ import 'package:flauncher/providers/vpn_guard_service.dart';
 import 'package:flauncher/widgets/rounded_switch_list_tile.dart';
 import 'package:flauncher/widgets/settings/focusable_settings_tile.dart';
 import 'package:flauncher/widgets/settings/settings_theme.dart';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -113,7 +115,7 @@ class _VpnGuardPageState extends State<VpnGuardPage> {
                     value: vpn.isGuarded(app.packageName),
                     onChanged: (_) => vpn.toggleGuarded(app.packageName),
                     title: Text(app.name, style: body),
-                    secondary: Icon(vpn.isGuarded(app.packageName) ? Icons.lock : Icons.lock_open),
+                    secondary: _AppIcon(app.packageName),
                   )),
             ],
           ),
@@ -172,4 +174,17 @@ Future<void> _pickVpnApp(BuildContext context, VpnGuardService vpn) async {
     ),
   );
   if (chosen != null) await vpn.setVpnApp(chosen);
+}
+
+class _AppIcon extends StatelessWidget {
+  final String packageName;
+  const _AppIcon(this.packageName);
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Uint8List>(
+        future: context.read<AppsService>().getAppIcon(packageName),
+        builder: (context, snapshot) => snapshot.hasData
+            ? Image.memory(snapshot.data!, width: 32, height: 32)
+            : const SizedBox(width: 32, height: 32),
+      );
 }

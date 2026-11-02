@@ -71,6 +71,12 @@ public class QuickPanelActivity extends FlutterActivity {
                     ArcAccessibilityService.lockNow();
                     result.success(null);
                 }
+                case "currentApp" -> result.success(
+                        VpnGuard.currentApp(app, ArcAccessibilityService.foregroundPackage()));
+                case "setVpnGuarded" -> {
+                    VpnGuard.setGuarded(app, call.argument("packageName"), Boolean.TRUE.equals(call.argument("guarded")));
+                    result.success(null);
+                }
                 case "openLauncherSettings" -> {
                     if (panel != null) panel.close();
                     MainActivity.openSettingsOnResume = true;

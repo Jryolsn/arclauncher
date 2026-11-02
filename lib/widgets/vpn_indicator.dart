@@ -23,15 +23,12 @@ class VpnIndicator extends StatelessWidget {
       ]);
     }
 
+    // Kept short: details (VPN app, IP, provider) are in the quick panel and on the VPN settings page.
     final place = [
       if (status.flag != null) status.flag!,
       if (status.city != null) status.city! else if (status.country != null) status.country!,
     ].join(' ');
-    final parts = [
-      status.vpnApp ?? 'VPN',
-      if (place.isNotEmpty) place,
-      if (status.ip != null) status.ip!,
-    ];
+    final parts = [place.isNotEmpty ? place : 'VPN'];
     return Row(mainAxisSize: MainAxisSize.min, children: [
       const Icon(Icons.lock, size: 18, color: Colors.lightGreenAccent, shadows: _shadows),
       const SizedBox(width: 6),

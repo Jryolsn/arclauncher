@@ -91,6 +91,12 @@ public class ArcAccessibilityService extends AccessibilityService {
         return true;
     }
 
+    /** The app on screen under Arc's own windows, or null when the service isn't running. */
+    static String foregroundPackage() {
+        ArcAccessibilityService service = instance;
+        return service == null ? null : service.foreground;
+    }
+
     static boolean isRunning() {
         return instance != null;
     }

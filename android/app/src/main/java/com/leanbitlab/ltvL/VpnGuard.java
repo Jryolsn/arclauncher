@@ -137,6 +137,35 @@ final class VpnGuard {
         }
     }
 
+    /** The app's icon as PNG, for Flutter. */
+    static byte[] iconPng(Context context, String packageName) {
+        try {
+            android.graphics.drawable.Drawable d = context.getPackageManager().getApplicationIcon(packageName);
+            int size = 96;
+            android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888);
+            android.graphics.Canvas canvas = new android.graphics.Canvas(bitmap);
+            d.setBounds(0, 0, size, size);
+            d.draw(canvas);
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
+            return out.toByteArray();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** For the quick panel: the app on screen and whether it needs VPN, plus the VPN status. */
+    static Map<String, Object> currentApp(Context context, String packageName) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("vpn", status(context));
+        if (packageName == null || packageName.equals(context.getPackageName())) return map;
+        map.put("packageName", packageName);
+        map.put("name", label(context, packageName));
+        map.put("icon", iconPng(context, packageName));
+        map.put("guarded", isGuarded(context, packageName));
+        return map;
+    }
+
     private static boolean isInstalled(Context context, String packageName) {
         return label(context, packageName) != null;
     }
