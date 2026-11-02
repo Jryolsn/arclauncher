@@ -219,7 +219,10 @@ final class VpnGuard {
     static Boolean covers(Context context, String packageName) {
         if (packageName == null || !canCheckApps(context) || !isUp(context)) return null;
         List<int[]> ranges = vpnUidRanges(context);
-        if (ranges == null) return null;
+        if (ranges == null) {
+            android.util.Log.w("ArcVpn", "VPN app list not found for " + packageName);
+            return null;
+        }
         int uid;
         try {
             uid = context.getPackageManager().getApplicationInfo(packageName, 0).uid;
@@ -236,10 +239,26 @@ final class VpnGuard {
     private static synchronized List<int[]> vpnUidRanges(Context context) {
         long now = SystemClock.elapsedRealtime();
         if (vpnUidRanges != null && now - vpnUidsAt < UIDS_MAX_AGE_MS) return vpnUidRanges;
+        // The service may finish writing after dumpService returns, so read again a little later if the
+        // VPN line isn't there yet (seen on the first look after the panel opens).
+        for (int attempt = 0; attempt < 4; attempt++) {
+            if (attempt > 0) SystemClock.sleep(80L * attempt);
+            List<int[]> ranges = readVpnUidRanges(context);
+            if (ranges != null) {
+                vpnUidRanges = ranges;
+                vpnUidsAt = now;
+                return ranges;
+            }
+        }
+        return null;
+    }
+
+    private static List<int[]> readVpnUidRanges(Context context) {
         java.io.File file = new java.io.File(context.getCacheDir(), "connectivity.txt");
         try {
             try (java.io.FileOutputStream out = new java.io.FileOutputStream(file)) {
                 if (!android.os.Debug.dumpService("connectivity", out.getFD(), new String[0])) return null;
+                out.getFD().sync();
             }
             List<int[]> ranges = new ArrayList<>();
             boolean sawVpn = false;
@@ -264,11 +283,10 @@ final class VpnGuard {
                     }
                 }
             }
-            vpnUidRanges = sawVpn ? ranges : null;
+            if (!sawVpn) return null;
             String[] owners = ownerUid > 0 ? context.getPackageManager().getPackagesForUid(ownerUid) : null;
             vpnOwnerPackage = owners != null && owners.length > 0 ? owners[0] : null;
-            vpnUidsAt = now;
-            return vpnUidRanges;
+            return ranges;
         } catch (Exception e) {
             android.util.Log.w("ArcVpn", "Reading VPN apps failed: " + e);
             return null;
