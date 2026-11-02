@@ -60,6 +60,11 @@ Future<void> quickPanelMain() async {
       await lock.refresh();
       await _loadCurrentApp();
       _shown.value++;
+      // Right after the panel opens the VPN table can still be missing: look once more shortly after.
+      final first = _currentApp.value;
+      if (first != null && first['covered'] == null && (first['vpn'] as Map?)?['up'] == true) {
+        Future.delayed(const Duration(milliseconds: 1200), _loadCurrentApp);
+      }
     }
     return null;
   });
