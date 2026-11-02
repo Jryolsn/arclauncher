@@ -145,13 +145,14 @@ class _QuickPanel extends StatelessWidget {
               child: Column(
                 children: [
                   const SettingsPageHeader(title: 'Quick settings'),
+                  // Fixed above the list, so the app and its VPN status stay in view while scrolling.
+                  const _CurrentAppCard(),
                   Expanded(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const _CurrentAppCard(),
                           RoundedSwitchListTile(
                             autofocus: true,
                             title: Text('Dim screen', style: textStyle),
