@@ -106,16 +106,19 @@ class _VpnGuardPageState extends State<VpnGuardPage> {
                   style: TextStyle(color: Colors.white60),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-                child: Text(
-                  status.canCheckApps
-                      ? 'Per-app check: on. Arc sees which apps the VPN covers.'
-                      : 'Per-app check: off. To let Arc see which apps the VPN covers, run once from a computer:\n'
-                          'adb shell pm grant com.jryolsn.arc android.permission.DUMP',
-                  style: TextStyle(color: status.canCheckApps ? Colors.white60 : Colors.white70),
-                ),
+              FocusableSettingsTile(
+                showChevron: true,
+                leading: Icon(status.canCheckApps ? Icons.verified_outlined : Icons.help_outline),
+                title: Text('Exact per-app check: ${status.canCheckApps ? 'on' : 'off'}', style: body),
+                onPressed: () => _showExactCheckGuide(context, status.canCheckApps),
               ),
+              if (vpn.status.vpnAppPackage != null)
+                FocusableSettingsTile(
+                  showChevron: true,
+                  leading: const Icon(Icons.open_in_new),
+                  title: Text('Open $vpnAppName', style: body),
+                  onPressed: vpn.openVpnApp,
+                ),
               const SettingsSectionDivider(),
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 0, 16, 4),
@@ -214,6 +217,71 @@ Future<void> toggleVpnGuardWithReminder(BuildContext context, String packageName
       content: Text(
           'If $vpnApp only tunnels chosen apps, add $appName to its list too. '
           'Arc blocks $appName when no VPN is on, but can\'t see whether the VPN carries this particular app.'),
+      actions: [
+        if (vpn.status.vpnAppPackage != null)
+          TextButton(
+            autofocus: true,
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              vpn.openVpnApp();
+            },
+            child: Text('Open $vpnApp'),
+          ),
+        TextButton(
+          autofocus: vpn.status.vpnAppPackage == null,
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: const Text('OK'),
+        ),
+      ],
+    ),
+  );
+}
+
+/// What the exact per-app check is, why it helps, how to turn it on or off, and what it allows.
+Future<void> _showExactCheckGuide(BuildContext context, bool on) {
+  const command = 'adb shell pm grant com.jryolsn.arc android.permission.DUMP';
+  const undo = 'adb shell pm revoke com.jryolsn.arc android.permission.DUMP';
+  final body = Theme.of(context).textTheme.bodyMedium;
+  final mono = body?.copyWith(fontFamily: 'monospace', color: Colors.lightBlueAccent);
+  return showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Exact per-app check'),
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(on ? 'Status: on.' : 'Status: off.', style: body?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text(
+                'Without it, Arc only knows whether a VPN is on. If your VPN app tunnels chosen apps only, '
+                'an app that needs VPN but is missing from that list still opens, and goes out directly.',
+                style: body),
+            const SizedBox(height: 8),
+            Text(
+                'With it, Arc reads which apps the VPN actually carries. Then the quick panel shows '
+                '"Through VPN" or "Not on VPN" for the app you are in, Arc names the VPN app by itself, and an '
+                'app that needs VPN is blocked when it is not in the tunnel.',
+                style: body),
+            const SizedBox(height: 12),
+            Text('Turn it on (once per TV, from a computer with adb connected to the TV):', style: body),
+            const SizedBox(height: 4),
+            SelectableText(command, style: mono),
+            const SizedBox(height: 12),
+            Text(
+                'What it allows: Arc may read Android\'s diagnostic output (the same as "adb shell dumpsys"). '
+                'That includes network state, installed apps and some notification and account details. '
+                'It cannot change anything. Arc only uses the network part. '
+                'It stays after updates and restarts, and is removed if Arc is uninstalled.',
+                style: body),
+            const SizedBox(height: 8),
+            Text('Turn it off again:', style: body),
+            const SizedBox(height: 4),
+            SelectableText(undo, style: mono),
+          ],
+        ),
+      ),
       actions: [
         TextButton(
           autofocus: true,

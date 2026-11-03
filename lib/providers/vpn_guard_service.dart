@@ -131,6 +131,13 @@ class VpnGuardService extends ChangeNotifier {
     await refresh();
   }
 
+  /// Opens the VPN app (the one running the VPN, or the one chosen). False when none is known.
+  Future<bool> openVpnApp() async {
+    final pkg = _status.vpnAppPackage;
+    if (pkg == null) return false;
+    return await _channel.invokeMethod<bool>('launchApp', pkg) ?? false;
+  }
+
   /// Android's own VPN page (always-on VPN, block connections without VPN). Hidden in Google TV's menus.
   Future<bool> openSystemVpnSettings() async =>
       await _channel.invokeMethod<bool>('vpnOpenSystemSettings') ?? false;
