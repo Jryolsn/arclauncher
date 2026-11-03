@@ -1,6 +1,7 @@
 
 import 'package:flauncher/providers/app_lock_service.dart';
 import 'package:flauncher/providers/vpn_guard_service.dart';
+import 'package:flauncher/widgets/settings/vpn_guard_page.dart';
 import 'dart:typed_data';
 
 import 'package:flauncher/models/app.dart';
@@ -103,7 +104,7 @@ class AppDetailsPage extends StatelessWidget {
                 context,
                 icon: vpnGuard.isGuarded(application.packageName) ? Icons.vpn_lock : Icons.vpn_key_outlined,
                 title: vpnGuard.isGuarded(application.packageName) ? "Don't require VPN" : 'Require VPN',
-                onTap: () => vpnGuard.toggleGuarded(application.packageName),
+                onTap: () => toggleVpnGuardWithReminder(context, application.packageName, application.name),
               ),
               if (!application.hidden)
                 _buildListTile(

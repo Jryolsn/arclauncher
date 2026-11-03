@@ -285,7 +285,7 @@ class _VpnSection extends StatelessWidget {
           vpnLine = 'Not on VPN · direct connection';
         } else {
           vpnLine = [
-            covered == null ? 'VPN on (this app not checked)' : 'Through VPN',
+            covered == null ? 'VPN on (not verified for this app)' : 'Through VPN',
             if (place.isNotEmpty) place,
             if (vpn.ip != null) vpn.ip!,
           ].join(' · ');
@@ -320,6 +320,12 @@ class _VpnSection extends StatelessWidget {
                   await _panelChannel.invokeMethod('setVpnGuarded', {'packageName': packageName, 'guarded': value});
                   await _loadCurrentApp();
                 },
+              ),
+            if (packageName != null && guarded && covered == null && !vpn.canCheckApps)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 8, 4),
+                child: Text('Make sure it is also in ${vpn.vpnApp ?? 'your VPN app'}\'s list of apps.',
+                    style: textTheme.bodySmall?.copyWith(color: Colors.white60)),
               ),
             const SettingsSectionDivider(),
           ],

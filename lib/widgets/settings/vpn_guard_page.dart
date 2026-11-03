@@ -123,7 +123,7 @@ class _VpnGuardPageState extends State<VpnGuardPage> {
               ),
               ...apps.map((app) => RoundedSwitchListTile(
                     value: vpn.isGuarded(app.packageName),
-                    onChanged: (_) => vpn.toggleGuarded(app.packageName),
+                    onChanged: (_) => toggleVpnGuardWithReminder(context, app.packageName, app.name),
                     title: Text(app.name, style: body),
                     secondary: _AppIcon(app.packageName),
                   )),
@@ -197,4 +197,30 @@ class _AppIcon extends StatelessWidget {
             ? Image.memory(snapshot.data!, width: 32, height: 32)
             : const SizedBox(width: 32, height: 32),
       );
+}
+
+/// Turns "needs VPN" on or off for an app. Turning it on reminds, when Arc can't check it itself, that the app
+/// must also be in the VPN app's own list: Arc only sees whether a VPN is up, not which apps it carries.
+Future<void> toggleVpnGuardWithReminder(BuildContext context, String packageName, String appName) async {
+  final vpn = context.read<VpnGuardService>();
+  final turningOn = !vpn.isGuarded(packageName);
+  await vpn.toggleGuarded(packageName);
+  if (!turningOn || vpn.status.canCheckApps || !context.mounted) return;
+  final vpnApp = vpn.status.vpnApp ?? 'your VPN app';
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text('Also add $appName in $vpnApp'),
+      content: Text(
+          'If $vpnApp only tunnels chosen apps, add $appName to its list too. '
+          'Arc blocks $appName when no VPN is on, but can\'t see whether the VPN carries this particular app.'),
+      actions: [
+        TextButton(
+          autofocus: true,
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: const Text('OK'),
+        ),
+      ],
+    ),
+  );
 }
