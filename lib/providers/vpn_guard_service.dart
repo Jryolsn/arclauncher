@@ -26,6 +26,9 @@ class VpnStatus {
   /// Arc may read which apps the VPN covers (DUMP permission, granted over adb).
   final bool canCheckApps;
 
+  /// Arc's accessibility service runs: without it the guard can't see apps opening and blocks nothing.
+  final bool guardActive;
+
   const VpnStatus({
     this.up = false,
     this.ip,
@@ -36,6 +39,7 @@ class VpnStatus {
     this.vpnApp,
     this.vpnAppPackage,
     this.canCheckApps = false,
+    this.guardActive = false,
   });
 
   factory VpnStatus.fromMap(Map<dynamic, dynamic> map) {
@@ -54,6 +58,7 @@ class VpnStatus {
       vpnApp: s('vpnApp'),
       vpnAppPackage: s('vpnAppPackage'),
       canCheckApps: map['canCheckApps'] == true,
+      guardActive: map['guardActive'] == true,
     );
   }
 

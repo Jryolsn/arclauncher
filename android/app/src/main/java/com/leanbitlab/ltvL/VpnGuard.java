@@ -368,6 +368,7 @@ final class VpnGuard {
         map.put("vpnAppPackage", vpnApp);
         map.put("vpnApp", label(context, vpnApp));
         map.put("canCheckApps", canCheckApps(context));
+        map.put("guardActive", ArcAccessibilityService.isRunning());
         if (up && SystemClock.elapsedRealtime() - infoAt > INFO_MAX_AGE_MS) fetchInfo(false);
         return map;
     }

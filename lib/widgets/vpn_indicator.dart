@@ -15,6 +15,15 @@ class VpnIndicator extends StatelessWidget {
     final status = vpn.status;
     if (!status.up && vpn.guardedPackages.isEmpty) return const SizedBox.shrink();
 
+    // Apps need VPN but Arc's accessibility service is off: nothing is guarded, say so first.
+    if (vpn.guardedPackages.isNotEmpty && !status.guardActive) {
+      return const Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.gpp_bad_outlined, size: 18, color: Colors.redAccent, shadows: _shadows),
+        SizedBox(width: 6),
+        Text('VPN guard off', style: TextStyle(fontSize: 15, color: Colors.redAccent, shadows: _shadows)),
+      ]);
+    }
+
     if (!status.up) {
       return const Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(Icons.lock_open, size: 18, color: Colors.orangeAccent, shadows: _shadows),
@@ -30,7 +39,9 @@ class VpnIndicator extends StatelessWidget {
     ].join(' ');
     final parts = [place.isNotEmpty ? place : 'VPN'];
     return Row(mainAxisSize: MainAxisSize.min, children: [
-      const Icon(Icons.lock, size: 18, color: Colors.lightGreenAccent, shadows: _shadows),
+      // A shield with a tick when Arc can check each app (exact per-app check), a plain lock otherwise.
+      Icon(status.canCheckApps ? Icons.verified_user : Icons.lock,
+          size: 18, color: Colors.lightGreenAccent, shadows: _shadows),
       const SizedBox(width: 6),
       Text(parts.join(' · '),
           style: const TextStyle(fontSize: 15, color: Colors.white, shadows: _shadows)),
