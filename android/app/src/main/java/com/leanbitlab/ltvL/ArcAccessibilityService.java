@@ -424,17 +424,32 @@ public class ArcAccessibilityService extends AccessibilityService {
     }
 
     /**
-     * The stock home screen came to the front: show Arc instead. Returns true when it did. Matched on the
-     * package, since its window class isn't the HOME activity's name (Back from an app showed it unchanged).
+     * The stock home screen sent an event: if it is really in front a moment later, show Arc instead.
+     * It also sends events from the background (seen over YouTube), and the active window can lag the
+     * event, so the check runs after a short delay. Returns true when the event came from it.
      */
     private boolean replaceStockHome(String pkg, String cls) {
         if (!replacingLauncher() || !otherHomes.contains(pkg)) return false;
-        long now = SystemClock.elapsedRealtime();
-        if (now - redirectedAt < 1_500) return true;
-        redirectedAt = now;
-        Log.d("ArcHome", "replacing " + pkg + "/" + cls);
-        openArcHome();
+        handler.removeCallbacks(checkStockHome);
+        handler.postDelayed(checkStockHome, 250);
+        Log.d("ArcHome", "event " + pkg + "/" + cls);
         return true;
+    }
+
+    private final Runnable checkStockHome = () -> {
+        String active = activeWindowPackage();
+        if (active == null || !otherHomes.contains(active) || !replacingLauncher()) return;
+        long now = SystemClock.elapsedRealtime();
+        if (now - redirectedAt < 1_500) return;
+        redirectedAt = now;
+        Log.d("ArcHome", "replacing " + active);
+        openArcHome();
+    };
+
+    private String activeWindowPackage() {
+        android.view.accessibility.AccessibilityNodeInfo root = getRootInActiveWindow();
+        if (root == null || root.getPackageName() == null) return null;
+        return root.getPackageName().toString();
     }
 
     private void openArcHome() {

@@ -61,7 +61,8 @@ class LauncherState extends ChangeNotifier
     LauncherState launcherState = context.read<LauncherState>();
     SettingsService settingsService = context.read<SettingsService>();
 
-    if (kDebugMode || launcherState.isDefaultLauncher) {
+    // Closing Arc would drop the user on the stock home screen it is meant to replace.
+    if (kDebugMode || launcherState.isDefaultLauncher || settingsService.replaceLauncher) {
       launcherState.refresh(appsService);
       String action = settingsService.backButtonAction;
 

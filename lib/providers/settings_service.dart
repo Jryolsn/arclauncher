@@ -99,6 +99,9 @@ class SettingsService extends ChangeNotifier {
   bool get appHighlightAnimationEnabled =>
       showFocusBorders && (_sharedPreferences.getBool(_appHighlightAnimationEnabledKey) ?? false);
 
+  /// "Replace current launcher" (replace_launcher_page.dart): Arc acts as home without being the default.
+  bool get replaceLauncher => _sharedPreferences.getBool("replace_launcher") ?? false;
+
   bool get appKeyClickEnabled => _sharedPreferences.getBool(_appKeyClickEnabledKey) ?? true;
 
   bool get autoHideAppBarEnabled => _sharedPreferences.getBool(_autoHideAppBar) ?? false;
