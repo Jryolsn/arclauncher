@@ -404,7 +404,7 @@ public class ArcAccessibilityService extends AccessibilityService {
         return !arcIsDefault;
     }
 
-    /** The other home screens on the TV, as "package/activity", and whether Arc is the default one. */
+    /** The packages of the other home screens on the TV, and whether Arc is the default one. */
     private void readHomes() {
         long now = SystemClock.elapsedRealtime();
         if (now - homesReadAt < HOME_CACHE_MS) return;
@@ -416,16 +416,19 @@ public class ArcAccessibilityService extends AccessibilityService {
         Set<String> homes = new HashSet<>();
         for (ResolveInfo info : pm.queryIntentActivities(home, 0)) {
             String pkg = info.activityInfo.packageName;
-            // Settings' FallbackHome only shows while the TV boots.
-            if (pkg.equals(getPackageName()) || pkg.contains("settings")) continue;
-            homes.add(pkg + "/" + info.activityInfo.name);
+            // Settings' FallbackHome and the setup wizard only show while the TV boots or is set up.
+            if (pkg.equals(getPackageName()) || pkg.contains("settings") || pkg.contains("setup")) continue;
+            homes.add(pkg);
         }
         otherHomes = homes;
     }
 
-    /** The stock home screen came to the front: show Arc instead. Returns true when it did. */
+    /**
+     * The stock home screen came to the front: show Arc instead. Returns true when it did. Matched on the
+     * package, since its window class isn't the HOME activity's name (Back from an app showed it unchanged).
+     */
     private boolean replaceStockHome(String pkg, String cls) {
-        if (!replacingLauncher() || !otherHomes.contains(pkg + "/" + cls)) return false;
+        if (!replacingLauncher() || !otherHomes.contains(pkg)) return false;
         long now = SystemClock.elapsedRealtime();
         if (now - redirectedAt < 1_500) return true;
         redirectedAt = now;
