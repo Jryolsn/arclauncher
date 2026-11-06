@@ -13,6 +13,10 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import java.util.HashSet;
+import java.util.Set;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.view.Gravity;
@@ -33,6 +37,8 @@ import android.view.accessibility.AccessibilityEvent;
  *    paused and covered at once if the VPN drops while it is open.
  * 2. Opening the quick panel (QuickPanelActivity) by holding Home or with a spare remote button (the YouTube
  *    button by default), so brightness and the lock can be changed without leaving the app that is open.
+ * 5. Replace the current launcher: while Arc isn't the default home app, Home opens Arc, and the stock
+ *    home screen is swapped for Arc whenever it shows up (boot, leaving an app), so it can stay installed.
  *
  * Settings are shared with the Flutter side through its SharedPreferences file (keys start with "flutter.").
  */
@@ -43,6 +49,7 @@ public class ArcAccessibilityService extends AccessibilityService {
     /** Darkness last asked for by Arc (0 = off), so the layer comes back after a restart. */
     static final String KEY_DARKNESS = "flutter.native_dim_darkness";
     static final String KEY_QUICK_KEY = "flutter.quick_panel_keycode";
+    static final String KEY_REPLACE_LAUNCHER = "flutter.replace_launcher";
 
     /** Not darker than this, so the picture can never go fully black by mistake. */
     private static final int MAX_DARKNESS = 90;
@@ -154,6 +161,7 @@ public class ArcAccessibilityService extends AccessibilityService {
                 || cls.contains("InputMethod") || pkg.contains("inputmethod") || pkg.contains(".ime")) {
             return;
         }
+        if (replaceStockHome(pkg, cls)) return;
         // Arc's own overlays (VPN note, dim layer, Flutter views) aren't an app change; only its home screen is.
         if (pkg.equals(getPackageName()) && !cls.startsWith(HOME_SCREEN)) return;
         boolean entered = !pkg.equals(foreground);
@@ -353,7 +361,7 @@ public class ArcAccessibilityService extends AccessibilityService {
             handler.removeCallbacks(homeLongPress);
             if (!homeLongPressed) {
                 hidePanel();
-                performGlobalAction(GLOBAL_ACTION_HOME);
+                if (replacingLauncher()) openArcHome(); else performGlobalAction(GLOBAL_ACTION_HOME);
             }
         }
         return true;
@@ -380,5 +388,56 @@ public class ArcAccessibilityService extends AccessibilityService {
         if (service != null && service.foreground != null) {
             service.handler.postDelayed(() -> service.checkLock(service.foreground), 300);
         }
+    }
+
+    // ---- Replace the current launcher ----
+
+    private static final long HOME_CACHE_MS = 60_000;
+    private Set<String> otherHomes = new HashSet<>();
+    private boolean arcIsDefault;
+    private long homesReadAt = -HOME_CACHE_MS;
+    private long redirectedAt;
+
+    private boolean replacingLauncher() {
+        if (!prefs(this).getBoolean(KEY_REPLACE_LAUNCHER, false)) return false;
+        readHomes();
+        return !arcIsDefault;
+    }
+
+    /** The other home screens on the TV, as "package/activity", and whether Arc is the default one. */
+    private void readHomes() {
+        long now = SystemClock.elapsedRealtime();
+        if (now - homesReadAt < HOME_CACHE_MS) return;
+        homesReadAt = now;
+        PackageManager pm = getPackageManager();
+        Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+        ResolveInfo def = pm.resolveActivity(home, PackageManager.MATCH_DEFAULT_ONLY);
+        arcIsDefault = def != null && def.activityInfo != null && getPackageName().equals(def.activityInfo.packageName);
+        Set<String> homes = new HashSet<>();
+        for (ResolveInfo info : pm.queryIntentActivities(home, 0)) {
+            String pkg = info.activityInfo.packageName;
+            // Settings' FallbackHome only shows while the TV boots.
+            if (pkg.equals(getPackageName()) || pkg.contains("settings")) continue;
+            homes.add(pkg + "/" + info.activityInfo.name);
+        }
+        otherHomes = homes;
+    }
+
+    /** The stock home screen came to the front: show Arc instead. Returns true when it did. */
+    private boolean replaceStockHome(String pkg, String cls) {
+        if (!replacingLauncher() || !otherHomes.contains(pkg + "/" + cls)) return false;
+        long now = SystemClock.elapsedRealtime();
+        if (now - redirectedAt < 1_500) return true;
+        redirectedAt = now;
+        Log.d("ArcHome", "replacing " + pkg + "/" + cls);
+        openArcHome();
+        return true;
+    }
+
+    private void openArcHome() {
+        startActivity(new Intent(this, MainActivity.class)
+                .setAction(Intent.ACTION_MAIN)
+                .addCategory(Intent.CATEGORY_HOME)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED | Intent.FLAG_ACTIVITY_NO_ANIMATION));
     }
 }
